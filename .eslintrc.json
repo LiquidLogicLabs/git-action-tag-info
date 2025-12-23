@@ -18,6 +18,7 @@
   "env": {
     "node": true,
     "es2022": true
-  }
+  },
+  "ignorePatterns": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "dist/**", "node_modules/**"]
 }
 

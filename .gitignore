@@ -30,6 +30,13 @@ coverage/
 .nyc_output/
 
 # AI Tools
-.bmad-core/
-.github/chatmodes/
+#.bmad-core/
+#.github/chatmodes/
+
+# Act (local GitHub Actions testing)
+.act-event-*.json
+.act.*
+!.act.*.example
+# Note: .act.env and .act.secrets are safe to commit (they're templates with commented values)
+# If you uncomment and add secrets, consider adding them to .gitignore
 

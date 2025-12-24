@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Act Build Script for git-tag-info-action
 # This script runs GitHub Actions workflows locally using act
 
 set -e

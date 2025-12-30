@@ -38,13 +38,32 @@ exports.getAllTagNames = getAllTagNames;
 exports.getAllTags = getAllTags;
 const https = __importStar(require("https"));
 const rest_1 = require("@octokit/rest");
+const plugin_throttling_1 = require("@octokit/plugin-throttling");
+const core = __importStar(require("@actions/core"));
 const types_1 = require("./types");
+// Create Octokit with throttling plugin for automatic rate limit handling
+const ThrottledOctokit = rest_1.Octokit.plugin(plugin_throttling_1.throttling);
 /**
- * Create an Octokit instance with optional authentication and certificate validation
+ * Create an Octokit instance with optional authentication, certificate validation, and rate limit handling
  */
 function createOctokit(token, ignoreCertErrors = false) {
     const options = {
         auth: token,
+        throttle: {
+            onRateLimit: (retryAfter, options, octokit, retryCount) => {
+                core.warning(`Rate limit exceeded for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
+                // Retry up to 2 times
+                if (retryCount < 2) {
+                    return true;
+                }
+                return false;
+            },
+            onSecondaryRateLimit: (retryAfter, options, octokit) => {
+                core.warning(`Secondary rate limit detected for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
+                // Always retry secondary rate limits (abuse detection)
+                return true;
+            },
+        },
     };
     // Handle certificate validation for GitHub Enterprise with self-signed certs
     if (ignoreCertErrors) {
@@ -55,7 +74,7 @@ function createOctokit(token, ignoreCertErrors = false) {
             agent,
         };
     }
-    return new rest_1.Octokit(options);
+    return new ThrottledOctokit(options);
 }
 /**
  * Get tag information from GitHub API

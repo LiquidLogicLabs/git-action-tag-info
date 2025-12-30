@@ -1,13 +1,37 @@
 import * as https from 'https';
 import { Octokit } from '@octokit/rest';
+import { throttling } from '@octokit/plugin-throttling';
+import * as core from '@actions/core';
 import { TagInfo, TagType } from './types';
 
+// Create Octokit with throttling plugin for automatic rate limit handling
+const ThrottledOctokit = Octokit.plugin(throttling);
+
 /**
- * Create an Octokit instance with optional authentication and certificate validation
+ * Create an Octokit instance with optional authentication, certificate validation, and rate limit handling
  */
-function createOctokit(token?: string, ignoreCertErrors: boolean = false): Octokit {
-  const options: ConstructorParameters<typeof Octokit>[0] = {
+function createOctokit(token?: string, ignoreCertErrors: boolean = false): InstanceType<typeof ThrottledOctokit> {
+  const options: ConstructorParameters<typeof ThrottledOctokit>[0] = {
     auth: token,
+    throttle: {
+      onRateLimit: (retryAfter, options, octokit, retryCount) => {
+        core.warning(
+          `Rate limit exceeded for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`
+        );
+        // Retry up to 2 times
+        if (retryCount < 2) {
+          return true;
+        }
+        return false;
+      },
+      onSecondaryRateLimit: (retryAfter, options, octokit) => {
+        core.warning(
+          `Secondary rate limit detected for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`
+        );
+        // Always retry secondary rate limits (abuse detection)
+        return true;
+      },
+    },
   };
 
   // Handle certificate validation for GitHub Enterprise with self-signed certs
@@ -20,7 +44,7 @@ function createOctokit(token?: string, ignoreCertErrors: boolean = false): Octok
     };
   }
 
-  return new Octokit(options);
+  return new ThrottledOctokit(options);
 }
 
 /**

@@ -1,1 +1,1 @@
-{"version":3,"file":"rest.js","sourceRoot":"","sources":["../../../src/__mocks__/@octokit/rest.ts"],"names":[],"mappings":";;;AAAA,2EAA2E;AACpE,MAAM,OAAO,GAAG;IACrB,gBAAe,CAAC;CACjB,CAAC;AAFW,QAAA,OAAO,WAElB"}
+{"version":3,"file":"rest.js","sourceRoot":"","sources":["../../../src/__mocks__/@octokit/rest.ts"],"names":[],"mappings":";;;AAAA,2EAA2E;AACpE,MAAM,OAAO,GAAG;IACrB,gBAAe,CAAC;IAChB,MAAM,CAAC,MAAM;QACX,OAAO,IAAI,CAAC;IACd,CAAC;CACF,CAAC;AALW,QAAA,OAAO,WAKlB"}

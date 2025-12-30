@@ -120,6 +120,70 @@ Or with a custom token:
   run: echo "Latest tag is ${{ steps.tag-info.outputs.tag_name }}"
 ```
 
+### Get Latest Tag with Format Filtering
+
+Filter tags by format pattern when resolving "latest". This is useful when repositories have multiple tag formats (e.g., version tags like `3.23` and edge tags like `edge-e9613ab3-ls213`):
+
+```yaml
+- name: Get latest version tag
+  id: tag-info
+  uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    repository: https://github.com/linuxserver/docker-baseimage-alpine
+    tag_format: X.X  # Finds latest tag like "3.23" instead of "edge-e9613ab3-ls213"
+
+- name: Use latest version tag
+  run: echo "Latest version tag is ${{ steps.tag-info.outputs.tag_name }}"
+```
+
+**Format Pattern Types:**
+
+1. **Simple Patterns**: Use `X` as a placeholder for numbers
+   - `"X.X"` matches tags like `3.23`, `1.2`, `10.5`
+   - `"X.X.X"` matches tags like `1.2.3`, `10.5.0`
+   - `"vX.X.X"` matches tags like `v1.2.3`, `v10.5.0`
+
+2. **Regex Patterns**: For advanced matching, use regex patterns
+   - `"^v\\d+\\.\\d+$"` matches tags like `v1.2`, `v10.5`
+   - `"^\\d+\\.\\d+\\.\\d+-.*"` matches tags like `1.2.3-alpha`, `2.0.0-beta`
+
+**Matching Behavior:**
+- **Full Match**: Pattern must match the entire tag name (e.g., `"3.23"` matches `"3.23"` exactly)
+- **Prefix Match**: If full match fails, tries to match the tag prefix (e.g., `"X.X"` matches `"3.23-bae0df8a-ls3"` by extracting `"3.23"`)
+
+**Examples:**
+
+```yaml
+# Match tags with format X.X (e.g., 3.23, 1.2)
+- uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    repository: https://github.com/owner/repo
+    tag_format: X.X
+
+# Match tags with format X.X.X (e.g., 1.2.3, 10.5.0)
+- uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    repository: https://github.com/owner/repo
+    tag_format: X.X.X
+
+# Match tags with v prefix (e.g., v1.2.3)
+- uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    repository: https://github.com/owner/repo
+    tag_format: vX.X.X
+
+# Use regex for advanced patterns
+- uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    repository: https://github.com/owner/repo
+    tag_format: '^v\\d+\\.\\d+\\.\\d+$'  # Matches v1.2.3, v10.5.0, etc.
+```
+
 ### Version Pinning
 
 This action supports flexible version pinning to balance stability and updates:
@@ -175,6 +239,7 @@ This action supports flexible version pinning to balance stability and updates:
 | `base_url` | Custom base URL for self-hosted instances (e.g., https://gitea.example.com) | No | - |
 | `token` | Custom Personal Access Token (works for all platforms). If not provided, automatically falls back to `GITHUB_TOKEN` environment variable when available (e.g., in GitHub Actions) | No | - |
 | `ignore_cert_errors` | Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). **Warning**: This is a security risk and should only be used with trusted self-hosted instances | No | `false` |
+| `tag_format` | Format pattern to filter tags when resolving "latest" (e.g., `"X.X"` or `"X.X.X"` for numeric patterns, or regex for advanced patterns). Only tags matching this format will be considered when resolving "latest" | No | - |
 
 ## Outputs
 
@@ -320,9 +385,12 @@ jobs:
 
 When `tag_name` is set to `"latest"`, the action uses the following strategy:
 
-1. **Semver First**: If semantic version tags exist (e.g., v1.2.3, 1.0.0), it selects the highest version
-2. **Date Fallback**: If no semver tags exist, it selects the most recent tag by creation date
-3. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
+1. **Format Filtering** (if `tag_format` is provided): Filter tags to only those matching the specified format pattern
+2. **Semver First**: If semantic version tags exist (e.g., v1.2.3, 1.0.0), it selects the highest version
+3. **Date Fallback**: If no semver tags exist, it selects the most recent tag by creation date
+4. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
+
+**Note**: Format filtering happens before sorting, so only tags matching the format are considered. If no tags match the format, the action will fail with a clear error message.
 
 ## Repository Detection
 

@@ -37,6 +37,7 @@ export interface RepoConfig {
     path?: string;
     token?: string;
     ignoreCertErrors?: boolean;
+    tagFormat?: string;
 }
 /**
  * HTTP response structure for API calls

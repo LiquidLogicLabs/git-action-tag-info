@@ -40,6 +40,7 @@ export interface RepoConfig {
   path?: string;
   token?: string;
   ignoreCertErrors?: boolean;
+  tagFormat?: string;
 }
 
 /**

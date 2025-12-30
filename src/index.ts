@@ -79,6 +79,7 @@ async function run(): Promise<void> {
     // Fallback to GITHUB_TOKEN if custom token is not provided
     const token = core.getInput('token') || process.env.GITHUB_TOKEN;
     const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
+    const tagFormat = core.getInput('tag_format') || undefined;
 
     // Warn if certificate errors are being ignored (security risk)
     if (ignoreCertErrors) {
@@ -112,7 +113,7 @@ async function run(): Promise<void> {
     let resolvedTagName = tagName;
     if (tagName.toLowerCase() === 'latest') {
       core.info('Resolving latest tag...');
-      resolvedTagName = await resolveLatestTag(repoConfig);
+      resolvedTagName = await resolveLatestTag(repoConfig, tagFormat);
       core.info(`Resolved latest tag: ${resolvedTagName}`);
     }
 

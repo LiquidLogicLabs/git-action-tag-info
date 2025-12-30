@@ -5,6 +5,7 @@ import { getAllTags as getGithubTags, getAllTagNames as getGithubTagNames } from
 import { getAllTags as getGiteaTags } from './gitea-client';
 import { getAllTags as getBitbucketTags } from './bitbucket-client';
 import { isSemver, sortTagsBySemver, compareSemver } from './semver';
+import { filterTagsByFormat, matchTagFormat } from './format-matcher';
 
 /**
  * Get all tags from repository based on configuration
@@ -84,11 +85,18 @@ async function getAllTagNamesFromRepo(config: RepoConfig): Promise<string[]> {
 /**
  * Resolve "latest" tag name
  * Strategy: Try semver first (using fast name-only fetch for GitHub), then fallback to date
+ * If tagFormat is provided, filter tags by format before sorting
  */
 export async function resolveLatestTag(
-  config: RepoConfig
+  config: RepoConfig,
+  tagFormat?: string
 ): Promise<string> {
   core.info('Resolving latest tag...');
+
+  // If tagFormat is provided, log it
+  if (tagFormat) {
+    core.info(`Filtering tags by format: ${tagFormat}`);
+  }
 
   // Optimization: For GitHub, first try to get just tag names (fast, no dates)
   // and check if we can resolve using semver without fetching dates
@@ -100,8 +108,19 @@ export async function resolveLatestTag(
         throw new Error('No tags found in repository');
       }
 
-      // Filter semver tags
-      const semverTags = tagNames.filter((tagName) => isSemver(tagName));
+      // Apply format filtering if provided
+      let filteredTagNames = tagNames;
+      if (tagFormat) {
+        filteredTagNames = filterTagsByFormat(tagNames, tagFormat);
+        core.info(`Format filtering: ${filteredTagNames.length} of ${tagNames.length} tags match format "${tagFormat}"`);
+        
+        if (filteredTagNames.length === 0) {
+          throw new Error(`No tags found matching format pattern "${tagFormat}"`);
+        }
+      }
+
+      // Filter semver tags from the (potentially format-filtered) tags
+      const semverTags = filteredTagNames.filter((tagName) => isSemver(tagName));
 
       if (semverTags.length > 0) {
         core.info(`Found ${semverTags.length} semver tags, using semver comparison (optimized: no date fetching needed)`);
@@ -116,6 +135,10 @@ export async function resolveLatestTag(
       core.info('No semver tags found, falling back to date-based sorting');
     } catch (error) {
       // If optimized path fails, fall through to full tag fetch
+      if (error instanceof Error && error.message.includes('No tags found matching format')) {
+        // Re-throw format matching errors
+        throw error;
+      }
       core.warning(`Optimized tag name fetch failed, using full tag fetch: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
   }
@@ -127,8 +150,25 @@ export async function resolveLatestTag(
     throw new Error('No tags found in repository');
   }
 
+  // Apply format filtering if provided
+  let filteredTags = allTags;
+  if (tagFormat) {
+    const filteredTagNames = filterTagsByFormat(
+      allTags.map((tag) => tag.name),
+      tagFormat
+    );
+    core.info(`Format filtering: ${filteredTagNames.length} of ${allTags.length} tags match format "${tagFormat}"`);
+    
+    if (filteredTagNames.length === 0) {
+      throw new Error(`No tags found matching format pattern "${tagFormat}"`);
+    }
+    
+    // Filter tags to only those matching the format
+    filteredTags = allTags.filter((tag) => filteredTagNames.includes(tag.name));
+  }
+
   // Filter semver tags (in case we didn't check earlier)
-  const semverTags = allTags.filter((tag) => isSemver(tag.name));
+  const semverTags = filteredTags.filter((tag) => isSemver(tag.name));
 
   if (semverTags.length > 0) {
     core.info(`Found ${semverTags.length} semver tags, using semver comparison`);
@@ -141,7 +181,7 @@ export async function resolveLatestTag(
 
   // Fallback to date-based sorting
   core.info('No semver tags found, falling back to date-based sorting');
-  const tagsWithDates = allTags.filter((tag) => tag.date);
+  const tagsWithDates = filteredTags.filter((tag) => tag.date);
 
   if (tagsWithDates.length > 0) {
     // Sort by date (most recent first)
@@ -157,7 +197,7 @@ export async function resolveLatestTag(
 
   // If no dates available, return the last tag alphabetically (fallback)
   core.warning('No date information available, using alphabetical order');
-  const sorted = allTags.map((t) => t.name).sort();
+  const sorted = filteredTags.map((t) => t.name).sort();
   return sorted[sorted.length - 1];
 }
 

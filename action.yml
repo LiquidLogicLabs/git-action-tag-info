@@ -27,6 +27,9 @@ inputs:
     description: 'Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). Default: false'
     required: false
     default: 'false'
+  tag_format:
+    description: 'Format pattern to filter tags (e.g., "X.X" or "X.X.X" for numeric patterns, or regex for advanced patterns). When resolving "latest", only tags matching this format will be considered.'
+    required: false
 outputs:
   exists:
     description: 'Boolean indicating if tag exists'

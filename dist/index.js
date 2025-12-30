@@ -27347,6 +27347,139 @@ async function getAllTags(owner, repo, token, ignoreCertErrors = false) {
 
 /***/ }),
 
+/***/ 839:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Format matching utilities for tag filtering
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isSimplePattern = isSimplePattern;
+exports.convertSimplePatternToRegex = convertSimplePatternToRegex;
+exports.isRegexPattern = isRegexPattern;
+exports.matchTagFormat = matchTagFormat;
+exports.filterTagsByFormat = filterTagsByFormat;
+/**
+ * Check if a format string is a simple pattern (e.g., "X.X" or "X.X.X")
+ * Simple patterns use X as a placeholder for numbers
+ */
+function isSimplePattern(format) {
+    // Simple patterns contain only X, dots, and optional v prefix
+    // Examples: "X.X", "X.X.X", "vX.X.X"
+    const simplePatternRegex = /^v?X(\.X)+$/i;
+    return simplePatternRegex.test(format);
+}
+/**
+ * Convert a simple pattern to a regex
+ * "X.X" → /^\d+\.\d+$/
+ * "X.X.X" → /^\d+\.\d+\.\d+$/
+ * "vX.X.X" → /^v\d+\.\d+\.\d+$/
+ */
+function convertSimplePatternToRegex(format) {
+    // Replace X with \d+ (one or more digits)
+    // Escape dots to match literal dots
+    let regexPattern = format.replace(/X/gi, '\\d+');
+    // Add anchors for full match
+    regexPattern = `^${regexPattern}$`;
+    return new RegExp(regexPattern);
+}
+/**
+ * Check if a format string looks like a regex pattern
+ * Regex patterns typically start with ^ or contain regex special characters
+ */
+function isRegexPattern(format) {
+    // If it starts with ^ or contains regex special characters, treat as regex
+    if (format.startsWith('^') || format.startsWith('/')) {
+        return true;
+    }
+    // Check for regex special characters that wouldn't appear in simple patterns
+    const regexSpecialChars = /[()[\]{}*+?|\\]/;
+    return regexSpecialChars.test(format);
+}
+/**
+ * Extract prefix from tag name (before first non-numeric/non-dot character)
+ * Used for prefix matching
+ * Examples:
+ *   "3.23-bae0df8a-ls3" → "3.23"
+ *   "v1.2.3-alpha" → "v1.2.3"
+ *   "2.5" → "2.5"
+ */
+function extractPrefix(tagName) {
+    // Match from start: optional 'v', then digits and dots
+    const prefixMatch = tagName.match(/^(v?\d+(?:\.\d+)*)/);
+    return prefixMatch ? prefixMatch[1] : '';
+}
+/**
+ * Match a tag name against a format pattern
+ * Supports both full match and prefix match
+ *
+ * @param tagName - The tag name to match
+ * @param format - The format pattern (simple like "X.X" or regex)
+ * @returns true if tag matches the format
+ */
+function matchTagFormat(tagName, format) {
+    if (!format || !tagName) {
+        return false;
+    }
+    let regex;
+    // Determine if it's a simple pattern or regex
+    if (isSimplePattern(format)) {
+        regex = convertSimplePatternToRegex(format);
+    }
+    else if (isRegexPattern(format)) {
+        // Handle regex patterns
+        // Remove leading/trailing slashes if present (e.g., "/pattern/" → "pattern")
+        let regexStr = format.replace(/^\/|\/$/g, '');
+        // If it doesn't start with ^, add it for full match
+        if (!regexStr.startsWith('^')) {
+            regexStr = `^${regexStr}`;
+        }
+        // If it doesn't end with $, add it for full match
+        if (!regexStr.endsWith('$')) {
+            regexStr = `${regexStr}$`;
+        }
+        try {
+            regex = new RegExp(regexStr);
+        }
+        catch (error) {
+            // Invalid regex, return false
+            return false;
+        }
+    }
+    else {
+        // Treat as literal string (exact match)
+        return tagName === format;
+    }
+    // Try full match first
+    if (regex.test(tagName)) {
+        return true;
+    }
+    // If full match fails, try prefix match
+    const prefix = extractPrefix(tagName);
+    if (prefix && regex.test(prefix)) {
+        return true;
+    }
+    return false;
+}
+/**
+ * Filter tags by format pattern
+ *
+ * @param tagNames - Array of tag names to filter
+ * @param format - The format pattern to match against
+ * @returns Array of tag names that match the format
+ */
+function filterTagsByFormat(tagNames, format) {
+    if (!format) {
+        return tagNames;
+    }
+    return tagNames.filter((tagName) => matchTagFormat(tagName, format));
+}
+
+
+/***/ }),
+
 /***/ 7551:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -28011,6 +28144,7 @@ async function run() {
         // Fallback to GITHUB_TOKEN if custom token is not provided
         const token = core.getInput('token') || process.env.GITHUB_TOKEN;
         const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
+        const tagFormat = core.getInput('tag_format') || undefined;
         // Warn if certificate errors are being ignored (security risk)
         if (ignoreCertErrors) {
             core.warning('SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.');
@@ -28027,7 +28161,7 @@ async function run() {
         let resolvedTagName = tagName;
         if (tagName.toLowerCase() === 'latest') {
             core.info('Resolving latest tag...');
-            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig);
+            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig, tagFormat);
             core.info(`Resolved latest tag: ${resolvedTagName}`);
         }
         // Get tag information
@@ -28459,6 +28593,7 @@ const github_client_1 = __nccwpck_require__(7890);
 const gitea_client_1 = __nccwpck_require__(4485);
 const bitbucket_client_1 = __nccwpck_require__(1420);
 const semver_1 = __nccwpck_require__(1475);
+const format_matcher_1 = __nccwpck_require__(839);
 /**
  * Get all tags from repository based on configuration
  */
@@ -28520,9 +28655,14 @@ async function getAllTagNamesFromRepo(config) {
 /**
  * Resolve "latest" tag name
  * Strategy: Try semver first (using fast name-only fetch for GitHub), then fallback to date
+ * If tagFormat is provided, filter tags by format before sorting
  */
-async function resolveLatestTag(config) {
+async function resolveLatestTag(config, tagFormat) {
     core.info('Resolving latest tag...');
+    // If tagFormat is provided, log it
+    if (tagFormat) {
+        core.info(`Filtering tags by format: ${tagFormat}`);
+    }
     // Optimization: For GitHub, first try to get just tag names (fast, no dates)
     // and check if we can resolve using semver without fetching dates
     if (config.type === 'remote' && config.platform === types_1.Platform.GITHUB) {
@@ -28531,8 +28671,17 @@ async function resolveLatestTag(config) {
             if (tagNames.length === 0) {
                 throw new Error('No tags found in repository');
             }
-            // Filter semver tags
-            const semverTags = tagNames.filter((tagName) => (0, semver_1.isSemver)(tagName));
+            // Apply format filtering if provided
+            let filteredTagNames = tagNames;
+            if (tagFormat) {
+                filteredTagNames = (0, format_matcher_1.filterTagsByFormat)(tagNames, tagFormat);
+                core.info(`Format filtering: ${filteredTagNames.length} of ${tagNames.length} tags match format "${tagFormat}"`);
+                if (filteredTagNames.length === 0) {
+                    throw new Error(`No tags found matching format pattern "${tagFormat}"`);
+                }
+            }
+            // Filter semver tags from the (potentially format-filtered) tags
+            const semverTags = filteredTagNames.filter((tagName) => (0, semver_1.isSemver)(tagName));
             if (semverTags.length > 0) {
                 core.info(`Found ${semverTags.length} semver tags, using semver comparison (optimized: no date fetching needed)`);
                 // Sort by semver (highest first)
@@ -28546,6 +28695,10 @@ async function resolveLatestTag(config) {
         }
         catch (error) {
             // If optimized path fails, fall through to full tag fetch
+            if (error instanceof Error && error.message.includes('No tags found matching format')) {
+                // Re-throw format matching errors
+                throw error;
+            }
             core.warning(`Optimized tag name fetch failed, using full tag fetch: ${error instanceof Error ? error.message : 'unknown error'}`);
         }
     }
@@ -28554,8 +28707,19 @@ async function resolveLatestTag(config) {
     if (allTags.length === 0) {
         throw new Error('No tags found in repository');
     }
+    // Apply format filtering if provided
+    let filteredTags = allTags;
+    if (tagFormat) {
+        const filteredTagNames = (0, format_matcher_1.filterTagsByFormat)(allTags.map((tag) => tag.name), tagFormat);
+        core.info(`Format filtering: ${filteredTagNames.length} of ${allTags.length} tags match format "${tagFormat}"`);
+        if (filteredTagNames.length === 0) {
+            throw new Error(`No tags found matching format pattern "${tagFormat}"`);
+        }
+        // Filter tags to only those matching the format
+        filteredTags = allTags.filter((tag) => filteredTagNames.includes(tag.name));
+    }
     // Filter semver tags (in case we didn't check earlier)
-    const semverTags = allTags.filter((tag) => (0, semver_1.isSemver)(tag.name));
+    const semverTags = filteredTags.filter((tag) => (0, semver_1.isSemver)(tag.name));
     if (semverTags.length > 0) {
         core.info(`Found ${semverTags.length} semver tags, using semver comparison`);
         // Sort by semver (highest first)
@@ -28566,7 +28730,7 @@ async function resolveLatestTag(config) {
     }
     // Fallback to date-based sorting
     core.info('No semver tags found, falling back to date-based sorting');
-    const tagsWithDates = allTags.filter((tag) => tag.date);
+    const tagsWithDates = filteredTags.filter((tag) => tag.date);
     if (tagsWithDates.length > 0) {
         // Sort by date (most recent first)
         const sorted = tagsWithDates.sort((a, b) => {
@@ -28580,7 +28744,7 @@ async function resolveLatestTag(config) {
     }
     // If no dates available, return the last tag alphabetically (fallback)
     core.warning('No date information available, using alphabetical order');
-    const sorted = allTags.map((t) => t.name).sort();
+    const sorted = filteredTags.map((t) => t.name).sort();
     return sorted[sorted.length - 1];
 }
 

@@ -194,10 +194,27 @@ describe('format-matcher', () => {
         expect(matchTagFormat('abc.def.ghi-123', '*.*.*')).toBe(true);
       });
 
+      it('should match v* pattern', () => {
+        expect(matchTagFormat('v1', 'v*')).toBe(true);
+        expect(matchTagFormat('vlatest', 'v*')).toBe(true);
+        expect(matchTagFormat('vedge', 'v*')).toBe(true);
+        expect(matchTagFormat('1', 'v*')).toBe(false); // No v prefix
+        expect(matchTagFormat('v1.2', 'v*')).toBe(false); // Has dot, doesn't match v*
+      });
+
+      it('should match v*.* pattern', () => {
+        expect(matchTagFormat('v1.2', 'v*.*')).toBe(true);
+        expect(matchTagFormat('v3.23', 'v*.*')).toBe(true);
+        expect(matchTagFormat('vabc.def', 'v*.*')).toBe(true);
+        expect(matchTagFormat('1.2', 'v*.*')).toBe(false); // No v prefix
+        expect(matchTagFormat('v1', 'v*.*')).toBe(false); // No dot
+      });
+
       it('should match v*.*.* pattern', () => {
         expect(matchTagFormat('v1.2.3', 'v*.*.*')).toBe(true);
         expect(matchTagFormat('vabc.def.ghi', 'v*.*.*')).toBe(true);
         expect(matchTagFormat('1.2.3', 'v*.*.*')).toBe(false); // No v prefix
+        expect(matchTagFormat('v1.2', 'v*.*.*')).toBe(false); // Only one dot
       });
 
       it('should not match tags that do not match pattern', () => {

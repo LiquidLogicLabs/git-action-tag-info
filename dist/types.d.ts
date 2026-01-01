@@ -7,24 +7,40 @@ export declare enum Platform {
     BITBUCKET = "bitbucket"
 }
 /**
- * Tag type enumeration
+ * Item type enumeration
+ */
+export declare enum ItemType {
+    COMMIT = "commit",// Lightweight tag
+    TAG = "tag",// Annotated tag
+    RELEASE = "release"
+}
+/**
+ * Tag type enumeration (deprecated - use ItemType)
+ * @deprecated Use ItemType instead. TagType.COMMIT maps to ItemType.COMMIT, TagType.ANNOTATED maps to ItemType.TAG.
  */
 export declare enum TagType {
     COMMIT = "commit",
     ANNOTATED = "annotated"
 }
 /**
- * Tag information structure
+ * Item information structure (unified for tags and releases)
  */
-export interface TagInfo {
+export interface ItemInfo {
     exists: boolean;
-    tag_name: string;
-    tag_sha: string;
-    tag_type: TagType;
+    name: string;
+    item_sha: string;
+    item_type: ItemType;
     commit_sha: string;
-    tag_message: string;
+    details: string;
     verified: boolean;
+    is_draft: boolean;
+    is_prerelease: boolean;
 }
+/**
+ * Tag information structure (deprecated - use ItemInfo)
+ * @deprecated Use ItemInfo instead. Kept as alias for backward compatibility.
+ */
+export type TagInfo = ItemInfo;
 /**
  * Repository configuration
  */

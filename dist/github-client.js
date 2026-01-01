@@ -36,6 +36,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTagInfo = getTagInfo;
 exports.getAllTagNames = getAllTagNames;
 exports.getAllTags = getAllTags;
+exports.getReleaseInfo = getReleaseInfo;
+exports.getAllReleaseNames = getAllReleaseNames;
+exports.getAllReleases = getAllReleases;
 const https = __importStar(require("https"));
 const rest_1 = require("@octokit/rest");
 const plugin_throttling_1 = require("@octokit/plugin-throttling");
@@ -94,7 +97,7 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         // If it's a tag object, we need to fetch the tag object to get the commit
         let commitSha = objectSha;
         let tagMessage = '';
-        let tagType = types_1.TagType.COMMIT;
+        let itemType = types_1.ItemType.COMMIT;
         let verified = false;
         if (objectType === 'tag') {
             // Fetch the tag object
@@ -106,7 +109,7 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
                 });
                 commitSha = tagData.object.sha;
                 tagMessage = tagData.message || '';
-                tagType = types_1.TagType.ANNOTATED;
+                itemType = types_1.ItemType.TAG;
                 verified = tagData.verification?.verified || false;
             }
             catch (error) {
@@ -116,12 +119,14 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         }
         return {
             exists: true,
-            tag_name: tagName,
-            tag_sha: objectSha,
-            tag_type: tagType,
+            name: tagName,
+            item_sha: objectSha,
+            item_type: itemType,
             commit_sha: commitSha,
-            tag_message: tagMessage,
+            details: tagMessage,
             verified,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     catch (error) {
@@ -129,12 +134,14 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         if (error.status === 404) {
             return {
                 exists: false,
-                tag_name: tagName,
-                tag_sha: '',
-                tag_type: types_1.TagType.COMMIT,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.COMMIT,
                 commit_sha: '',
-                tag_message: '',
+                details: '',
                 verified: false,
+                is_draft: false,
+                is_prerelease: false,
             };
         }
         // Re-throw other errors with formatted message
@@ -216,6 +223,141 @@ async function getAllTags(owner, repo, token, ignoreCertErrors = false, maxTags 
             throw new Error(`Failed to get tags from GitHub: ${error.message}`);
         }
         throw new Error(`Failed to get tags from GitHub: ${String(error)}`);
+    }
+}
+/**
+ * Get release information from GitHub API
+ */
+async function getReleaseInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        // Get release by tag name or latest if tagName is "latest"
+        let releaseData;
+        if (tagName.toLowerCase() === 'latest') {
+            const { data } = await octokit.repos.getLatestRelease({
+                owner,
+                repo,
+            });
+            releaseData = data;
+        }
+        else {
+            const { data } = await octokit.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName,
+            });
+            releaseData = data;
+        }
+        // Fetch the tag SHA for the release's tag
+        let itemSha = '';
+        let commitSha = '';
+        try {
+            const { data: refData } = await octokit.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${releaseData.tag_name}`,
+            });
+            itemSha = refData.object.sha;
+            // Get commit SHA from tag
+            if (refData.object.type === 'tag') {
+                try {
+                    const { data: tagData } = await octokit.git.getTag({
+                        owner,
+                        repo,
+                        tag_sha: itemSha,
+                    });
+                    commitSha = tagData.object.sha;
+                }
+                catch {
+                    commitSha = itemSha;
+                }
+            }
+            else {
+                commitSha = itemSha;
+            }
+        }
+        catch (error) {
+            // If we can't get the tag ref, leave SHAs empty
+        }
+        return {
+            exists: true,
+            name: releaseData.tag_name,
+            item_sha: itemSha,
+            item_type: types_1.ItemType.RELEASE,
+            commit_sha: commitSha,
+            details: releaseData.body || '',
+            verified: false,
+            is_draft: releaseData.draft || false,
+            is_prerelease: releaseData.prerelease || false,
+        };
+    }
+    catch (error) {
+        // Handle 404 errors (release doesn't exist)
+        if (error.status === 404) {
+            return {
+                exists: false,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.RELEASE,
+                commit_sha: '',
+                details: '',
+                verified: false,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        // Re-throw other errors with formatted message
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release info from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get release info from GitHub: ${String(error)}`);
+    }
+}
+/**
+ * Get all release names from GitHub repository
+ */
+async function getAllReleaseNames(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        const { data: releases } = await octokit.repos.listReleases({
+            owner,
+            repo,
+            per_page: Math.min(maxReleases, 100),
+        });
+        // Extract release tag names
+        const releaseNames = releases.map((release) => release.tag_name).filter((name) => name);
+        return releaseNames;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release names from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get release names from GitHub: ${String(error)}`);
+    }
+}
+/**
+ * Get all releases from GitHub repository with dates
+ */
+async function getAllReleases(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        const { data: releases } = await octokit.repos.listReleases({
+            owner,
+            repo,
+            per_page: Math.min(maxReleases, 100),
+        });
+        // Extract release tag names and published dates
+        const allReleases = releases.map((release) => ({
+            name: release.tag_name,
+            date: release.published_at || release.created_at || '',
+        }));
+        return allReleases;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get releases from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get releases from GitHub: ${String(error)}`);
     }
 }
 //# sourceMappingURL=github-client.js.map

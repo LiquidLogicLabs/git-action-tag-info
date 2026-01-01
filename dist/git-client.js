@@ -103,12 +103,14 @@ function getTagInfo(tagName, repoPath) {
     if (!tagExists(tagName, repoPath)) {
         return {
             exists: false,
-            tag_name: tagName,
-            tag_sha: '',
-            tag_type: types_1.TagType.COMMIT,
+            name: tagName,
+            item_sha: '',
+            item_type: types_1.ItemType.COMMIT,
             commit_sha: '',
-            tag_message: '',
+            details: '',
             verified: false,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     const tagSha = getTagSha(tagName, repoPath);
@@ -127,12 +129,14 @@ function getTagInfo(tagName, repoPath) {
     }
     return {
         exists: true,
-        tag_name: tagName,
-        tag_sha: tagSha,
-        tag_type: isAnnotated ? types_1.TagType.ANNOTATED : types_1.TagType.COMMIT,
+        name: tagName,
+        item_sha: tagSha,
+        item_type: isAnnotated ? types_1.ItemType.TAG : types_1.ItemType.COMMIT,
         commit_sha: commitSha,
-        tag_message: tagMessage,
+        details: tagMessage,
         verified,
+        is_draft: false,
+        is_prerelease: false,
     };
 }
 //# sourceMappingURL=git-client.js.map

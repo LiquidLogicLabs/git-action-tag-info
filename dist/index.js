@@ -27214,6 +27214,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getTagInfo = getTagInfo;
 exports.getAllTags = getAllTags;
+exports.getReleaseInfo = getReleaseInfo;
+exports.getAllReleaseNames = getAllReleaseNames;
+exports.getAllReleases = getAllReleases;
 const https = __importStar(__nccwpck_require__(5692));
 const types_1 = __nccwpck_require__(8522);
 /**
@@ -27272,12 +27275,14 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         if (response.statusCode === 404) {
             return {
                 exists: false,
-                tag_name: tagName,
-                tag_sha: '',
-                tag_type: types_1.TagType.COMMIT,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.COMMIT,
                 commit_sha: '',
-                tag_message: '',
+                details: '',
                 verified: false,
+                is_draft: false,
+                is_prerelease: false,
             };
         }
         if (response.statusCode !== 200) {
@@ -27288,16 +27293,18 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         const tagSha = tagData.target?.hash || '';
         const commitSha = tagData.target?.hash || ''; // Bitbucket tags point directly to commits
         const tagMessage = tagData.message || '';
-        const tagType = tagData.type === 'tag' ? types_1.TagType.ANNOTATED : types_1.TagType.COMMIT;
+        const itemType = tagData.type === 'tag' ? types_1.ItemType.TAG : types_1.ItemType.COMMIT;
         const verified = false; // Bitbucket doesn't provide GPG verification status via API
         return {
             exists: true,
-            tag_name: tagName,
-            tag_sha: tagSha,
-            tag_type: tagType,
+            name: tagName,
+            item_sha: tagSha,
+            item_type: itemType,
             commit_sha: commitSha,
-            tag_message: tagMessage,
+            details: tagMessage,
             verified,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     catch (error) {
@@ -27339,6 +27346,111 @@ async function getAllTags(owner, repo, token, ignoreCertErrors = false) {
     catch (error) {
         if (error instanceof Error) {
             throw new Error(`Failed to get tags from Bitbucket: ${error.message}`);
+        }
+        throw error;
+    }
+}
+/**
+ * Get release information from Bitbucket API
+ * Note: Bitbucket doesn't have a dedicated releases API like GitHub/Gitea.
+ * Releases in Bitbucket are typically just tags. We'll try to use the tags endpoint
+ * and return release-like information if available.
+ */
+async function getReleaseInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
+    // Bitbucket doesn't have a separate releases API, so we'll use tags
+    // and return them as releases. The tag info will be returned as release info.
+    const tagInfo = await getTagInfo(tagName, owner, repo, token, ignoreCertErrors);
+    if (!tagInfo.exists) {
+        return {
+            ...tagInfo,
+            item_type: types_1.ItemType.RELEASE,
+            is_draft: false,
+            is_prerelease: false,
+        };
+    }
+    // Bitbucket doesn't support draft/prerelease flags via API
+    return {
+        ...tagInfo,
+        item_type: types_1.ItemType.RELEASE,
+        is_draft: false,
+        is_prerelease: false,
+    };
+}
+/**
+ * Get all release names from Bitbucket repository
+ * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names
+ */
+async function getAllReleaseNames(owner, repo, token, ignoreCertErrors = false) {
+    // Bitbucket doesn't have releases, so return tag names
+    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags?pagelen=100`;
+    try {
+        const allReleaseNames = [];
+        let nextUrl = url;
+        while (nextUrl) {
+            const response = await httpRequest(nextUrl, token, 'GET', ignoreCertErrors);
+            if (response.statusCode !== 200) {
+                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
+            }
+            const data = JSON.parse(response.body);
+            const tags = data.values || [];
+            if (tags.length === 0) {
+                break;
+            }
+            // Extract tag names
+            for (const tag of tags) {
+                if (tag.name) {
+                    allReleaseNames.push(tag.name);
+                }
+            }
+            // Check for next page
+            nextUrl = data.next || null;
+        }
+        return allReleaseNames;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release names from Bitbucket: ${error.message}`);
+        }
+        throw error;
+    }
+}
+/**
+ * Get all releases from Bitbucket repository with dates
+ * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names with dates
+ */
+async function getAllReleases(owner, repo, token, ignoreCertErrors = false) {
+    // Bitbucket doesn't have releases, so return tags with dates
+    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags?pagelen=100`;
+    try {
+        const allReleases = [];
+        let nextUrl = url;
+        while (nextUrl) {
+            const response = await httpRequest(nextUrl, token, 'GET', ignoreCertErrors);
+            if (response.statusCode !== 200) {
+                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
+            }
+            const data = JSON.parse(response.body);
+            const tags = data.values || [];
+            if (tags.length === 0) {
+                break;
+            }
+            // Extract tag names and dates
+            for (const tag of tags) {
+                if (tag.name) {
+                    allReleases.push({
+                        name: tag.name,
+                        date: tag.target?.date || tag.date || '',
+                    });
+                }
+            }
+            // Check for next page
+            nextUrl = data.next || null;
+        }
+        return allReleases;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get releases from Bitbucket: ${error.message}`);
         }
         throw error;
     }
@@ -27722,12 +27834,14 @@ function getTagInfo(tagName, repoPath) {
     if (!tagExists(tagName, repoPath)) {
         return {
             exists: false,
-            tag_name: tagName,
-            tag_sha: '',
-            tag_type: types_1.TagType.COMMIT,
+            name: tagName,
+            item_sha: '',
+            item_type: types_1.ItemType.COMMIT,
             commit_sha: '',
-            tag_message: '',
+            details: '',
             verified: false,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     const tagSha = getTagSha(tagName, repoPath);
@@ -27746,12 +27860,14 @@ function getTagInfo(tagName, repoPath) {
     }
     return {
         exists: true,
-        tag_name: tagName,
-        tag_sha: tagSha,
-        tag_type: isAnnotated ? types_1.TagType.ANNOTATED : types_1.TagType.COMMIT,
+        name: tagName,
+        item_sha: tagSha,
+        item_type: isAnnotated ? types_1.ItemType.TAG : types_1.ItemType.COMMIT,
         commit_sha: commitSha,
-        tag_message: tagMessage,
+        details: tagMessage,
         verified,
+        is_draft: false,
+        is_prerelease: false,
     };
 }
 
@@ -27799,6 +27915,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getTagInfo = getTagInfo;
 exports.getAllTags = getAllTags;
+exports.getReleaseInfo = getReleaseInfo;
+exports.getAllReleaseNames = getAllReleaseNames;
+exports.getAllReleases = getAllReleases;
 const https = __importStar(__nccwpck_require__(5692));
 const http = __importStar(__nccwpck_require__(8611));
 const types_1 = __nccwpck_require__(8522);
@@ -27859,12 +27978,14 @@ async function getTagInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors
         if (response.statusCode === 404) {
             return {
                 exists: false,
-                tag_name: tagName,
-                tag_sha: '',
-                tag_type: types_1.TagType.COMMIT,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.COMMIT,
                 commit_sha: '',
-                tag_message: '',
+                details: '',
                 verified: false,
+                is_draft: false,
+                is_prerelease: false,
             };
         }
         if (response.statusCode !== 200) {
@@ -27877,7 +27998,7 @@ async function getTagInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors
         // If it's a tag object, we need to fetch the tag object to get the commit
         let commitSha = objectSha;
         let tagMessage = '';
-        let tagType = types_1.TagType.COMMIT;
+        let itemType = types_1.ItemType.COMMIT;
         let verified = false;
         if (objectType === 'tag') {
             // Fetch the tag object
@@ -27887,19 +28008,21 @@ async function getTagInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors
                 const tagData = JSON.parse(tagResponse.body);
                 commitSha = tagData.object?.sha || objectSha;
                 tagMessage = tagData.message || '';
-                tagType = types_1.TagType.ANNOTATED;
+                itemType = types_1.ItemType.TAG;
                 // Gitea doesn't provide verification status in the same way
                 verified = false;
             }
         }
         return {
             exists: true,
-            tag_name: tagName,
-            tag_sha: objectSha,
-            tag_type: tagType,
+            name: tagName,
+            item_sha: objectSha,
+            item_type: itemType,
             commit_sha: commitSha,
-            tag_message: tagMessage,
+            details: tagMessage,
             verified,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     catch (error) {
@@ -27953,6 +28076,178 @@ async function getAllTags(owner, repo, baseUrl, token, ignoreCertErrors = false)
         throw error;
     }
 }
+/**
+ * Get release information from Gitea API
+ */
+async function getReleaseInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors = false) {
+    const apiBase = baseUrl.replace(/\/$/, '');
+    try {
+        let releaseUrl;
+        if (tagName.toLowerCase() === 'latest') {
+            // Get latest release
+            releaseUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/releases/latest`;
+        }
+        else {
+            // Get release by tag
+            releaseUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/releases/tags/${tagName}`;
+        }
+        const response = await httpRequest(releaseUrl, token, 'GET', ignoreCertErrors);
+        if (response.statusCode === 404) {
+            return {
+                exists: false,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.RELEASE,
+                commit_sha: '',
+                details: '',
+                verified: false,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        if (response.statusCode !== 200) {
+            throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+        }
+        const releaseData = JSON.parse(response.body);
+        // Fetch the tag SHA for the release's tag
+        let itemSha = '';
+        let commitSha = '';
+        try {
+            const tagUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/git/refs/tags/${releaseData.tag_name}`;
+            const tagResponse = await httpRequest(tagUrl, token, 'GET', ignoreCertErrors);
+            if (tagResponse.statusCode === 200) {
+                const refData = JSON.parse(tagResponse.body);
+                itemSha = refData.object?.sha || '';
+                // Get commit SHA from tag object if it's an annotated tag
+                if (refData.object?.type === 'tag' && itemSha) {
+                    const tagObjUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/git/tags/${itemSha}`;
+                    const tagObjResponse = await httpRequest(tagObjUrl, token, 'GET', ignoreCertErrors);
+                    if (tagObjResponse.statusCode === 200) {
+                        const tagObjData = JSON.parse(tagObjResponse.body);
+                        commitSha = tagObjData.object?.sha || itemSha;
+                    }
+                    else {
+                        commitSha = itemSha;
+                    }
+                }
+                else {
+                    commitSha = itemSha;
+                }
+            }
+        }
+        catch (error) {
+            // If we can't get the tag ref, leave SHAs empty
+        }
+        return {
+            exists: true,
+            name: releaseData.tag_name,
+            item_sha: itemSha,
+            item_type: types_1.ItemType.RELEASE,
+            commit_sha: commitSha,
+            details: releaseData.note || releaseData.body || '',
+            verified: false,
+            is_draft: releaseData.is_draft || false,
+            is_prerelease: releaseData.is_prerelease || false,
+        };
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release info from Gitea: ${error.message}`);
+        }
+        throw error;
+    }
+}
+/**
+ * Get all release names from Gitea repository
+ */
+async function getAllReleaseNames(owner, repo, baseUrl, token, ignoreCertErrors = false) {
+    const apiBase = baseUrl.replace(/\/$/, '');
+    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/releases?limit=100`;
+    try {
+        const allReleaseNames = [];
+        let page = 1;
+        let hasMore = true;
+        while (hasMore) {
+            const pageUrl = `${url}&page=${page}`;
+            const response = await httpRequest(pageUrl, token, 'GET', ignoreCertErrors);
+            if (response.statusCode !== 200) {
+                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+            }
+            const releases = JSON.parse(response.body);
+            if (!Array.isArray(releases) || releases.length === 0) {
+                hasMore = false;
+                break;
+            }
+            // Extract release tag names
+            for (const release of releases) {
+                if (release.tag_name) {
+                    allReleaseNames.push(release.tag_name);
+                }
+            }
+            // Check if there are more pages
+            if (releases.length < 100) {
+                hasMore = false;
+            }
+            else {
+                page++;
+            }
+        }
+        return allReleaseNames;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release names from Gitea: ${error.message}`);
+        }
+        throw error;
+    }
+}
+/**
+ * Get all releases from Gitea repository with dates
+ */
+async function getAllReleases(owner, repo, baseUrl, token, ignoreCertErrors = false) {
+    const apiBase = baseUrl.replace(/\/$/, '');
+    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/releases?limit=100`;
+    try {
+        const allReleases = [];
+        let page = 1;
+        let hasMore = true;
+        while (hasMore) {
+            const pageUrl = `${url}&page=${page}`;
+            const response = await httpRequest(pageUrl, token, 'GET', ignoreCertErrors);
+            if (response.statusCode !== 200) {
+                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+            }
+            const releases = JSON.parse(response.body);
+            if (!Array.isArray(releases) || releases.length === 0) {
+                hasMore = false;
+                break;
+            }
+            // Extract release tag names and published dates
+            for (const release of releases) {
+                if (release.tag_name) {
+                    allReleases.push({
+                        name: release.tag_name,
+                        date: release.published_at || release.created_at || '',
+                    });
+                }
+            }
+            // Check if there are more pages
+            if (releases.length < 100) {
+                hasMore = false;
+            }
+            else {
+                page++;
+            }
+        }
+        return allReleases;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get releases from Gitea: ${error.message}`);
+        }
+        throw error;
+    }
+}
 
 
 /***/ }),
@@ -27999,6 +28294,9 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getTagInfo = getTagInfo;
 exports.getAllTagNames = getAllTagNames;
 exports.getAllTags = getAllTags;
+exports.getReleaseInfo = getReleaseInfo;
+exports.getAllReleaseNames = getAllReleaseNames;
+exports.getAllReleases = getAllReleases;
 const https = __importStar(__nccwpck_require__(5692));
 const rest_1 = __nccwpck_require__(9380);
 const plugin_throttling_1 = __nccwpck_require__(6856);
@@ -28057,7 +28355,7 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         // If it's a tag object, we need to fetch the tag object to get the commit
         let commitSha = objectSha;
         let tagMessage = '';
-        let tagType = types_1.TagType.COMMIT;
+        let itemType = types_1.ItemType.COMMIT;
         let verified = false;
         if (objectType === 'tag') {
             // Fetch the tag object
@@ -28069,7 +28367,7 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
                 });
                 commitSha = tagData.object.sha;
                 tagMessage = tagData.message || '';
-                tagType = types_1.TagType.ANNOTATED;
+                itemType = types_1.ItemType.TAG;
                 verified = tagData.verification?.verified || false;
             }
             catch (error) {
@@ -28079,12 +28377,14 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         }
         return {
             exists: true,
-            tag_name: tagName,
-            tag_sha: objectSha,
-            tag_type: tagType,
+            name: tagName,
+            item_sha: objectSha,
+            item_type: itemType,
             commit_sha: commitSha,
-            tag_message: tagMessage,
+            details: tagMessage,
             verified,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
     catch (error) {
@@ -28092,12 +28392,14 @@ async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false)
         if (error.status === 404) {
             return {
                 exists: false,
-                tag_name: tagName,
-                tag_sha: '',
-                tag_type: types_1.TagType.COMMIT,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.COMMIT,
                 commit_sha: '',
-                tag_message: '',
+                details: '',
                 verified: false,
+                is_draft: false,
+                is_prerelease: false,
             };
         }
         // Re-throw other errors with formatted message
@@ -28181,6 +28483,141 @@ async function getAllTags(owner, repo, token, ignoreCertErrors = false, maxTags 
         throw new Error(`Failed to get tags from GitHub: ${String(error)}`);
     }
 }
+/**
+ * Get release information from GitHub API
+ */
+async function getReleaseInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        // Get release by tag name or latest if tagName is "latest"
+        let releaseData;
+        if (tagName.toLowerCase() === 'latest') {
+            const { data } = await octokit.repos.getLatestRelease({
+                owner,
+                repo,
+            });
+            releaseData = data;
+        }
+        else {
+            const { data } = await octokit.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName,
+            });
+            releaseData = data;
+        }
+        // Fetch the tag SHA for the release's tag
+        let itemSha = '';
+        let commitSha = '';
+        try {
+            const { data: refData } = await octokit.git.getRef({
+                owner,
+                repo,
+                ref: `tags/${releaseData.tag_name}`,
+            });
+            itemSha = refData.object.sha;
+            // Get commit SHA from tag
+            if (refData.object.type === 'tag') {
+                try {
+                    const { data: tagData } = await octokit.git.getTag({
+                        owner,
+                        repo,
+                        tag_sha: itemSha,
+                    });
+                    commitSha = tagData.object.sha;
+                }
+                catch {
+                    commitSha = itemSha;
+                }
+            }
+            else {
+                commitSha = itemSha;
+            }
+        }
+        catch (error) {
+            // If we can't get the tag ref, leave SHAs empty
+        }
+        return {
+            exists: true,
+            name: releaseData.tag_name,
+            item_sha: itemSha,
+            item_type: types_1.ItemType.RELEASE,
+            commit_sha: commitSha,
+            details: releaseData.body || '',
+            verified: false,
+            is_draft: releaseData.draft || false,
+            is_prerelease: releaseData.prerelease || false,
+        };
+    }
+    catch (error) {
+        // Handle 404 errors (release doesn't exist)
+        if (error.status === 404) {
+            return {
+                exists: false,
+                name: tagName,
+                item_sha: '',
+                item_type: types_1.ItemType.RELEASE,
+                commit_sha: '',
+                details: '',
+                verified: false,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        // Re-throw other errors with formatted message
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release info from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get release info from GitHub: ${String(error)}`);
+    }
+}
+/**
+ * Get all release names from GitHub repository
+ */
+async function getAllReleaseNames(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        const { data: releases } = await octokit.repos.listReleases({
+            owner,
+            repo,
+            per_page: Math.min(maxReleases, 100),
+        });
+        // Extract release tag names
+        const releaseNames = releases.map((release) => release.tag_name).filter((name) => name);
+        return releaseNames;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get release names from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get release names from GitHub: ${String(error)}`);
+    }
+}
+/**
+ * Get all releases from GitHub repository with dates
+ */
+async function getAllReleases(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
+    const octokit = createOctokit(token, ignoreCertErrors);
+    try {
+        const { data: releases } = await octokit.repos.listReleases({
+            owner,
+            repo,
+            per_page: Math.min(maxReleases, 100),
+        });
+        // Extract release tag names and published dates
+        const allReleases = releases.map((release) => ({
+            name: release.tag_name,
+            date: release.published_at || release.created_at || '',
+        }));
+        return allReleases;
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            throw new Error(`Failed to get releases from GitHub: ${error.message}`);
+        }
+        throw new Error(`Failed to get releases from GitHub: ${String(error)}`);
+    }
+}
 
 
 /***/ }),
@@ -28234,12 +28671,19 @@ const tag_resolver_1 = __nccwpck_require__(7722);
 const types_1 = __nccwpck_require__(8522);
 const format_parser_1 = __nccwpck_require__(9594);
 /**
- * Get tag information based on repository configuration
+ * Get item information (tag or release) based on repository configuration
  */
-async function getTagInfoFromRepo(tagName, config) {
+async function getItemInfoFromRepo(tagName, config, itemType) {
+    // Validate: releases are not supported for local repositories
+    if (itemType === 'release' && config.type === 'local') {
+        throw new Error('Releases are not supported for local repositories. Use tag_type: tags or query a remote repository.');
+    }
     if (config.type === 'local') {
         if (!config.path) {
             throw new Error('Local repository path is required');
+        }
+        if (itemType === 'release') {
+            throw new Error('Releases are not supported for local repositories');
         }
         return (0, git_client_1.getTagInfo)(tagName, config.path);
     }
@@ -28247,18 +28691,37 @@ async function getTagInfoFromRepo(tagName, config) {
         if (!config.platform || !config.owner || !config.repo) {
             throw new Error('Remote repository configuration is incomplete');
         }
-        switch (config.platform) {
-            case types_1.Platform.GITHUB:
-                return await (0, github_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-            case types_1.Platform.GITEA:
-                if (!config.baseUrl) {
-                    throw new Error('Gitea base URL is required');
-                }
-                return await (0, gitea_client_1.getTagInfo)(tagName, config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-            case types_1.Platform.BITBUCKET:
-                return await (0, bitbucket_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-            default:
-                throw new Error(`Unsupported platform: ${config.platform}`);
+        if (itemType === 'release') {
+            // Route to release functions
+            switch (config.platform) {
+                case types_1.Platform.GITHUB:
+                    return await (0, github_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
+                case types_1.Platform.GITEA:
+                    if (!config.baseUrl) {
+                        throw new Error('Gitea base URL is required');
+                    }
+                    return await (0, gitea_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
+                case types_1.Platform.BITBUCKET:
+                    return await (0, bitbucket_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
+                default:
+                    throw new Error(`Unsupported platform: ${config.platform}`);
+            }
+        }
+        else {
+            // Route to tag functions
+            switch (config.platform) {
+                case types_1.Platform.GITHUB:
+                    return await (0, github_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
+                case types_1.Platform.GITEA:
+                    if (!config.baseUrl) {
+                        throw new Error('Gitea base URL is required');
+                    }
+                    return await (0, gitea_client_1.getTagInfo)(tagName, config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
+                case types_1.Platform.BITBUCKET:
+                    return await (0, bitbucket_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
+                default:
+                    throw new Error(`Unsupported platform: ${config.platform}`);
+            }
         }
     }
     throw new Error('Invalid repository configuration');
@@ -28270,6 +28733,7 @@ async function run() {
     try {
         // Read inputs
         const tagName = core.getInput('tag_name', { required: true });
+        const tagType = core.getInput('tag_type') || 'tags'; // Default to 'tags'
         const repository = core.getInput('repository');
         const platform = core.getInput('platform');
         const owner = core.getInput('owner');
@@ -28280,6 +28744,10 @@ async function run() {
         const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
         const tagFormatInput = core.getInput('tag_format') || undefined;
         const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
+        // Validate tag_type input
+        if (tagType !== 'tags' && tagType !== 'release') {
+            throw new Error(`Invalid tag_type: ${tagType}. Must be 'tags' or 'release'`);
+        }
         // Warn if certificate errors are being ignored (security risk)
         if (ignoreCertErrors) {
             core.warning('SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.');
@@ -28291,35 +28759,47 @@ async function run() {
         // Detect repository configuration
         core.info('Detecting repository configuration...');
         const repoConfig = (0, repo_detector_1.detectRepository)(repository, platform, owner, repo, baseUrl, token, ignoreCertErrors);
-        core.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}`);
-        // Resolve "latest" tag if needed
+        core.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`);
+        // Resolve "latest" tag/release if needed
         let resolvedTagName = tagName;
         if (tagName.toLowerCase() === 'latest') {
-            core.info('Resolving latest tag...');
-            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig, tagFormat);
-            core.info(`Resolved latest tag: ${resolvedTagName}`);
+            const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+            core.info(`Resolving latest ${itemTypeLabel}...`);
+            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig, tagFormat, tagType);
+            core.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
         }
-        // Get tag information
-        core.info(`Fetching tag information for: ${resolvedTagName}`);
-        const tagInfo = await getTagInfoFromRepo(resolvedTagName, repoConfig);
-        // Set outputs
-        core.setOutput('exists', tagInfo.exists.toString());
-        core.setOutput('tag_name', tagInfo.tag_name);
-        core.setOutput('tag_sha', tagInfo.tag_sha);
-        core.setOutput('tag_type', tagInfo.tag_type);
-        core.setOutput('commit_sha', tagInfo.commit_sha);
-        core.setOutput('tag_message', tagInfo.tag_message);
-        core.setOutput('verified', tagInfo.verified.toString());
-        if (!tagInfo.exists) {
-            core.warning(`Tag "${resolvedTagName}" does not exist in the repository`);
+        // Get item information (tag or release)
+        const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+        core.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
+        const itemInfo = await getItemInfoFromRepo(resolvedTagName, repoConfig, tagType);
+        // Set outputs with normalized field names
+        core.setOutput('exists', itemInfo.exists.toString());
+        core.setOutput('name', itemInfo.name);
+        core.setOutput('item_sha', itemInfo.item_sha);
+        core.setOutput('item_type', itemInfo.item_type);
+        core.setOutput('commit_sha', itemInfo.commit_sha);
+        core.setOutput('details', itemInfo.details);
+        core.setOutput('verified', itemInfo.verified.toString());
+        core.setOutput('is_draft', itemInfo.is_draft.toString());
+        core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
+        if (!itemInfo.exists) {
+            core.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
         }
         else {
-            core.info(`Tag "${resolvedTagName}" found successfully`);
-            core.info(`  SHA: ${tagInfo.tag_sha}`);
-            core.info(`  Type: ${tagInfo.tag_type}`);
-            core.info(`  Commit: ${tagInfo.commit_sha}`);
-            if (tagInfo.tag_message) {
-                core.info(`  Message: ${tagInfo.tag_message.substring(0, 100)}...`);
+            core.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
+            core.info(`  Name: ${itemInfo.name}`);
+            core.info(`  SHA: ${itemInfo.item_sha}`);
+            core.info(`  Type: ${itemInfo.item_type}`);
+            core.info(`  Commit: ${itemInfo.commit_sha}`);
+            if (itemInfo.details) {
+                core.info(`  Details: ${itemInfo.details.substring(0, 100)}...`);
+            }
+            if (tagType === 'release') {
+                core.info(`  Draft: ${itemInfo.is_draft}`);
+                core.info(`  Prerelease: ${itemInfo.is_prerelease}`);
+            }
+            if (tagType === 'tags' && itemInfo.verified) {
+                core.info(`  Verified: ${itemInfo.verified}`);
             }
         }
     }
@@ -28730,12 +29210,19 @@ const bitbucket_client_1 = __nccwpck_require__(1420);
 const semver_1 = __nccwpck_require__(1475);
 const format_matcher_1 = __nccwpck_require__(839);
 /**
- * Get all tags from repository based on configuration
+ * Get all items (tags or releases) from repository based on configuration
  */
-async function getAllTagsFromRepo(config) {
+async function getAllItemsFromRepo(config, itemType) {
+    // Releases are not supported for local repositories
+    if (itemType === 'release' && config.type === 'local') {
+        throw new Error('Releases are not supported for local repositories');
+    }
     if (config.type === 'local') {
         if (!config.path) {
             throw new Error('Local repository path is required');
+        }
+        if (itemType === 'release') {
+            throw new Error('Releases are not supported for local repositories');
         }
         const tags = (0, git_client_1.getAllTags)(config.path);
         // For local tags, we don't have dates easily available, so return empty dates
@@ -28745,30 +29232,56 @@ async function getAllTagsFromRepo(config) {
         if (!config.platform || !config.owner || !config.repo) {
             throw new Error('Remote repository configuration is incomplete');
         }
-        switch (config.platform) {
-            case types_1.Platform.GITHUB:
-                return await (0, github_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-            case types_1.Platform.GITEA:
-                if (!config.baseUrl) {
-                    throw new Error('Gitea base URL is required');
-                }
-                return await (0, gitea_client_1.getAllTags)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-            case types_1.Platform.BITBUCKET:
-                return await (0, bitbucket_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-            default:
-                throw new Error(`Unsupported platform: ${config.platform}`);
+        if (itemType === 'release') {
+            // Route to release listing functions
+            switch (config.platform) {
+                case types_1.Platform.GITHUB:
+                    return await (0, github_client_1.getAllReleases)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                case types_1.Platform.GITEA:
+                    if (!config.baseUrl) {
+                        throw new Error('Gitea base URL is required');
+                    }
+                    return await (0, gitea_client_1.getAllReleases)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
+                case types_1.Platform.BITBUCKET:
+                    return await (0, bitbucket_client_1.getAllReleases)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                default:
+                    throw new Error(`Unsupported platform: ${config.platform}`);
+            }
+        }
+        else {
+            // Route to tag listing functions
+            switch (config.platform) {
+                case types_1.Platform.GITHUB:
+                    return await (0, github_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                case types_1.Platform.GITEA:
+                    if (!config.baseUrl) {
+                        throw new Error('Gitea base URL is required');
+                    }
+                    return await (0, gitea_client_1.getAllTags)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
+                case types_1.Platform.BITBUCKET:
+                    return await (0, bitbucket_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                default:
+                    throw new Error(`Unsupported platform: ${config.platform}`);
+            }
         }
     }
     throw new Error('Invalid repository configuration');
 }
 /**
- * Get all tag names from repository (optimized, no dates)
+ * Get all item names (tags or releases) from repository (optimized, no dates)
  * This is used for efficient semver resolution without fetching dates
  */
-async function getAllTagNamesFromRepo(config) {
+async function getAllItemNamesFromRepo(config, itemType) {
+    // Releases are not supported for local repositories
+    if (itemType === 'release' && config.type === 'local') {
+        throw new Error('Releases are not supported for local repositories');
+    }
     if (config.type === 'local') {
         if (!config.path) {
             throw new Error('Local repository path is required');
+        }
+        if (itemType === 'release') {
+            throw new Error('Releases are not supported for local repositories');
         }
         return (0, git_client_1.getAllTags)(config.path);
     }
@@ -28776,14 +29289,32 @@ async function getAllTagNamesFromRepo(config) {
         if (!config.platform || !config.owner || !config.repo) {
             throw new Error('Remote repository configuration is incomplete');
         }
-        // For GitHub, use the optimized function that doesn't fetch dates
-        if (config.platform === types_1.Platform.GITHUB) {
-            return await (0, github_client_1.getAllTagNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+        if (itemType === 'release') {
+            // Route to release name listing functions
+            switch (config.platform) {
+                case types_1.Platform.GITHUB:
+                    return await (0, github_client_1.getAllReleaseNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                case types_1.Platform.GITEA:
+                    if (!config.baseUrl) {
+                        throw new Error('Gitea base URL is required');
+                    }
+                    return await (0, gitea_client_1.getAllReleaseNames)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
+                case types_1.Platform.BITBUCKET:
+                    return await (0, bitbucket_client_1.getAllReleaseNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+                default:
+                    throw new Error(`Unsupported platform: ${config.platform}`);
+            }
         }
-        // For other platforms, we need to fetch tags with dates (they're efficient anyway)
-        // but we'll extract just the names
-        const tags = await getAllTagsFromRepo(config);
-        return tags.map((tag) => tag.name);
+        else {
+            // For GitHub tags, use the optimized function that doesn't fetch dates
+            if (config.platform === types_1.Platform.GITHUB) {
+                return await (0, github_client_1.getAllTagNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
+            }
+            // For other platforms, we need to fetch tags with dates (they're efficient anyway)
+            // but we'll extract just the names
+            const tags = await getAllItemsFromRepo(config, 'tags');
+            return tags.map((tag) => tag.name);
+        }
     }
     throw new Error('Invalid repository configuration');
 }
@@ -28819,13 +29350,14 @@ async function filterTagsWithFallback(tagNames, patterns, context) {
     throw new Error(`No tags found matching any format pattern: [${patternsList}]. Tried ${attemptedPatterns.length} pattern(s) in fallback order.`);
 }
 /**
- * Resolve "latest" tag name
+ * Resolve "latest" item name (tag or release)
  * Strategy: Try semver first (using fast name-only fetch for GitHub), then fallback to date
- * If tagFormat is provided, filter tags by format before sorting
+ * If tagFormat is provided, filter items by format before sorting
  * If tagFormat is an array, try each pattern in order as fallbacks
  */
-async function resolveLatestTag(config, tagFormat) {
-    core.info('Resolving latest tag...');
+async function resolveLatestTag(config, tagFormat, itemType = 'tags') {
+    const itemLabel = itemType === 'release' ? 'release' : 'tag';
+    core.info(`Resolving latest ${itemLabel}...`);
     // Normalize tagFormat to array for consistent handling
     const formatPatterns = Array.isArray(tagFormat)
         ? tagFormat
@@ -28841,81 +29373,81 @@ async function resolveLatestTag(config, tagFormat) {
             core.info(`Filtering tags by format patterns (fallback order): ${formatPatterns.join(', ')}`);
         }
     }
-    // Optimization: For GitHub, first try to get just tag names (fast, no dates)
+    // Optimization: For GitHub, first try to get just item names (fast, no dates)
     // and check if we can resolve using semver without fetching dates
-    if (config.type === 'remote' && config.platform === types_1.Platform.GITHUB) {
+    if (config.type === 'remote' && config.platform === types_1.Platform.GITHUB && itemType === 'tags') {
         try {
-            const tagNames = await getAllTagNamesFromRepo(config);
-            if (tagNames.length === 0) {
-                throw new Error('No tags found in repository');
+            const itemNames = await getAllItemNamesFromRepo(config, itemType);
+            if (itemNames.length === 0) {
+                throw new Error(`No ${itemLabel}s found in repository`);
             }
             // Apply format filtering if provided (with fallback support)
-            let filteredTagNames = tagNames;
+            let filteredItemNames = itemNames;
             if (formatPatterns) {
-                filteredTagNames = await filterTagsWithFallback(tagNames, formatPatterns, 'GitHub optimized path');
+                filteredItemNames = await filterTagsWithFallback(itemNames, formatPatterns, 'GitHub optimized path');
             }
-            // Filter semver tags from the (potentially format-filtered) tags
-            const semverTags = filteredTagNames.filter((tagName) => (0, semver_1.isSemver)(tagName));
-            if (semverTags.length > 0) {
-                core.info(`Found ${semverTags.length} semver tags, using semver comparison (optimized: no date fetching needed)`);
+            // Filter semver items from the (potentially format-filtered) items
+            const semverItems = filteredItemNames.filter((itemName) => (0, semver_1.isSemver)(itemName));
+            if (semverItems.length > 0) {
+                core.info(`Found ${semverItems.length} semver ${itemLabel}s, using semver comparison (optimized: no date fetching needed)`);
                 // Sort by semver (highest first)
-                const sorted = (0, semver_1.sortTagsBySemver)(semverTags);
+                const sorted = (0, semver_1.sortTagsBySemver)(semverItems);
                 const latest = sorted[0];
-                core.info(`Latest semver tag: ${latest}`);
+                core.info(`Latest semver ${itemLabel}: ${latest}`);
                 return latest;
             }
-            // If no semver tags, fall through to date-based sorting below
-            core.info('No semver tags found, falling back to date-based sorting');
+            // If no semver items, fall through to date-based sorting below
+            core.info(`No semver ${itemLabel}s found, falling back to date-based sorting`);
         }
         catch (error) {
-            // If optimized path fails, fall through to full tag fetch
+            // If optimized path fails, fall through to full item fetch
             if (error instanceof Error && error.message.includes('No tags found matching format pattern')) {
                 // Re-throw format matching errors (after all fallbacks exhausted)
                 throw error;
             }
-            core.warning(`Optimized tag name fetch failed, using full tag fetch: ${error instanceof Error ? error.message : 'unknown error'}`);
+            core.warning(`Optimized ${itemLabel} name fetch failed, using full ${itemLabel} fetch: ${error instanceof Error ? error.message : 'unknown error'}`);
         }
     }
-    // For non-GitHub platforms or if semver failed, get tags with dates
-    const allTags = await getAllTagsFromRepo(config);
-    if (allTags.length === 0) {
-        throw new Error('No tags found in repository');
+    // For non-GitHub platforms, releases, or if semver failed, get items with dates
+    const allItems = await getAllItemsFromRepo(config, itemType);
+    if (allItems.length === 0) {
+        throw new Error(`No ${itemLabel}s found in repository`);
     }
     // Apply format filtering if provided (with fallback support)
-    let filteredTags = allTags;
+    let filteredItems = allItems;
     if (formatPatterns) {
-        const allTagNames = allTags.map((tag) => tag.name);
-        const filteredTagNames = await filterTagsWithFallback(allTagNames, formatPatterns, 'full tag fetch path');
-        // Filter tags to only those matching the format
-        filteredTags = allTags.filter((tag) => filteredTagNames.includes(tag.name));
+        const allItemNames = allItems.map((item) => item.name);
+        const filteredItemNames = await filterTagsWithFallback(allItemNames, formatPatterns, `full ${itemLabel} fetch path`);
+        // Filter items to only those matching the format
+        filteredItems = allItems.filter((item) => filteredItemNames.includes(item.name));
     }
-    // Filter semver tags (in case we didn't check earlier)
-    const semverTags = filteredTags.filter((tag) => (0, semver_1.isSemver)(tag.name));
-    if (semverTags.length > 0) {
-        core.info(`Found ${semverTags.length} semver tags, using semver comparison`);
+    // Filter semver items (in case we didn't check earlier)
+    const semverItems = filteredItems.filter((item) => (0, semver_1.isSemver)(item.name));
+    if (semverItems.length > 0) {
+        core.info(`Found ${semverItems.length} semver ${itemLabel}s, using semver comparison`);
         // Sort by semver (highest first)
-        const sorted = (0, semver_1.sortTagsBySemver)(semverTags.map((t) => t.name));
+        const sorted = (0, semver_1.sortTagsBySemver)(semverItems.map((t) => t.name));
         const latest = sorted[0];
-        core.info(`Latest semver tag: ${latest}`);
+        core.info(`Latest semver ${itemLabel}: ${latest}`);
         return latest;
     }
     // Fallback to date-based sorting
-    core.info('No semver tags found, falling back to date-based sorting');
-    const tagsWithDates = filteredTags.filter((tag) => tag.date);
-    if (tagsWithDates.length > 0) {
+    core.info(`No semver ${itemLabel}s found, falling back to date-based sorting`);
+    const itemsWithDates = filteredItems.filter((item) => item.date);
+    if (itemsWithDates.length > 0) {
         // Sort by date (most recent first)
-        const sorted = tagsWithDates.sort((a, b) => {
+        const sorted = itemsWithDates.sort((a, b) => {
             const dateA = new Date(a.date).getTime();
             const dateB = new Date(b.date).getTime();
             return dateB - dateA; // Descending order
         });
         const latest = sorted[0].name;
-        core.info(`Latest tag by date: ${latest}`);
+        core.info(`Latest ${itemLabel} by date: ${latest}`);
         return latest;
     }
-    // If no dates available, return the last tag alphabetically (fallback)
+    // If no dates available, return the last item alphabetically (fallback)
     core.warning('No date information available, using alphabetical order');
-    const sorted = filteredTags.map((t) => t.name).sort();
+    const sorted = filteredItems.map((t) => t.name).sort();
     return sorted[sorted.length - 1];
 }
 
@@ -28928,7 +29460,7 @@ async function resolveLatestTag(config, tagFormat) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TagType = exports.Platform = void 0;
+exports.TagType = exports.ItemType = exports.Platform = void 0;
 /**
  * Supported Git hosting platforms
  */
@@ -28939,7 +29471,17 @@ var Platform;
     Platform["BITBUCKET"] = "bitbucket";
 })(Platform || (exports.Platform = Platform = {}));
 /**
- * Tag type enumeration
+ * Item type enumeration
+ */
+var ItemType;
+(function (ItemType) {
+    ItemType["COMMIT"] = "commit";
+    ItemType["TAG"] = "tag";
+    ItemType["RELEASE"] = "release";
+})(ItemType || (exports.ItemType = ItemType = {}));
+/**
+ * Tag type enumeration (deprecated - use ItemType)
+ * @deprecated Use ItemType instead. TagType.COMMIT maps to ItemType.COMMIT, TagType.ANNOTATED maps to ItemType.TAG.
  */
 var TagType;
 (function (TagType) {

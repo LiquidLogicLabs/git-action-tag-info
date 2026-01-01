@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `tag_type` input to support both git tags and platform releases (default: "tags")
+- Release support for GitHub, Gitea, and Bitbucket platforms
+- `is_draft` and `is_prerelease` outputs for release information
+- Support for resolving "latest" releases using the same strategy as tags
+
+### Changed
+- **BREAKING**: Normalized all output field names:
+  - `tag_name` → `name`
+  - `tag_sha` → `item_sha`
+  - `tag_type` → `item_type` (now returns "commit", "tag", or "release" instead of "commit" or "annotated")
+  - `tag_message` → `details`
+- Internal type system: `TagInfo` interface renamed to `ItemInfo` (TagInfo kept as alias for compatibility)
+- `TagType` enum replaced with `ItemType` enum (COMMIT, TAG, RELEASE)
+
+### Fixed
+- All test workflows updated to use normalized output field names
+
 ## [1.0.0] - 2025-01-XX
 
 ### Added

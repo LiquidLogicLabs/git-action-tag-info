@@ -30,21 +30,29 @@ inputs:
   tag_format:
     description: 'Format pattern(s) to filter tags. Supports single pattern (e.g., "X.X"), JSON array string (e.g., ["*.*.*", "*.*"]), or comma-separated values (e.g., "*.*.*,*.*"). Patterns are tried in order as fallbacks - if first pattern matches no tags, second pattern is tried, etc. When resolving "latest", only tags matching the first successful format pattern will be considered.'
     required: false
+  tag_type:
+    description: 'Type of item to fetch: "tags" (git tags) or "release" (platform releases). Default: "tags"'
+    required: false
+    default: 'tags'
 outputs:
   exists:
-    description: 'Boolean indicating if tag exists'
-  tag_name:
-    description: 'Tag name'
-  tag_sha:
-    description: 'Tag SHA'
-  tag_type:
-    description: 'Tag type (commit/annotated)'
+    description: 'Boolean indicating if item exists'
+  name:
+    description: 'Item name (tag name for tags/releases)'
+  item_sha:
+    description: 'Item SHA (tag SHA for tags/releases)'
+  item_type:
+    description: 'Item type (commit/tag/release)'
   commit_sha:
     description: 'Commit SHA'
-  tag_message:
-    description: 'Tag message'
+  details:
+    description: 'Item details (tag message or release body)'
   verified:
-    description: 'Whether tag is verified (if applicable)'
+    description: 'Whether item is verified (tags only, false for releases)'
+  is_draft:
+    description: 'Whether release is a draft (releases only, false for tags)'
+  is_prerelease:
+    description: 'Whether release is a prerelease (releases only, false for tags)'
 runs:
   using: 'node20'
   main: 'dist/index.js'

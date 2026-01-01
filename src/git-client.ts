@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { TagInfo, TagType } from './types';
+import { ItemInfo, ItemType } from './types';
 
 /**
  * Execute git command and return output
@@ -96,16 +96,18 @@ export function getAllTags(repoPath: string): string[] {
 /**
  * Get tag information from local repository
  */
-export function getTagInfo(tagName: string, repoPath: string): TagInfo {
+export function getTagInfo(tagName: string, repoPath: string): ItemInfo {
   if (!tagExists(tagName, repoPath)) {
     return {
       exists: false,
-      tag_name: tagName,
-      tag_sha: '',
-      tag_type: TagType.COMMIT,
+      name: tagName,
+      item_sha: '',
+      item_type: ItemType.COMMIT,
       commit_sha: '',
-      tag_message: '',
+      details: '',
       verified: false,
+      is_draft: false,
+      is_prerelease: false,
     };
   }
 
@@ -126,12 +128,14 @@ export function getTagInfo(tagName: string, repoPath: string): TagInfo {
 
   return {
     exists: true,
-    tag_name: tagName,
-    tag_sha: tagSha,
-    tag_type: isAnnotated ? TagType.ANNOTATED : TagType.COMMIT,
+    name: tagName,
+    item_sha: tagSha,
+    item_type: isAnnotated ? ItemType.TAG : ItemType.COMMIT,
     commit_sha: commitSha,
-    tag_message: tagMessage,
+    details: tagMessage,
     verified,
+    is_draft: false,
+    is_prerelease: false,
   };
 }
 

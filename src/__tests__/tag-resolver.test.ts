@@ -499,6 +499,85 @@ describe('tag-resolver', () => {
         expect(latest).toBe('3.23-bae0df8a-ls3');
       });
     });
+
+    describe('release resolution', () => {
+      it('should return latest release for GitHub', async () => {
+        const config: RepoConfig = {
+          type: 'remote',
+          platform: Platform.GITHUB,
+          owner: 'owner',
+          repo: 'repo',
+        };
+
+        (githubClient.getAllReleases as jest.Mock).mockResolvedValue([
+          { name: '1.0.0', date: '2024-01-01' },
+          { name: '2.0.0', date: '2024-01-02' },
+          { name: '1.5.0', date: '2024-01-03' },
+        ]);
+
+        const latest = await resolveLatestTag(config, undefined, 'release');
+        expect(latest).toBe('2.0.0');
+      });
+
+      it('should throw error when release requested for local repository', async () => {
+        const config: RepoConfig = {
+          type: 'local',
+          path: '/path/to/repo',
+        };
+
+        await expect(resolveLatestTag(config, undefined, 'release')).rejects.toThrow(
+          'Releases are not supported for local repositories'
+        );
+      });
+
+      it('should work with Gitea releases', async () => {
+        const config: RepoConfig = {
+          type: 'remote',
+          platform: Platform.GITEA,
+          owner: 'owner',
+          repo: 'repo',
+          baseUrl: 'https://gitea.example.com',
+        };
+
+        (giteaClient.getAllReleases as jest.Mock).mockResolvedValue([
+          { name: '1.0.0', date: '2024-01-01' },
+          { name: '2.0.0', date: '2024-01-02' },
+        ]);
+
+        const latest = await resolveLatestTag(config, undefined, 'release');
+        expect(latest).toBe('2.0.0');
+      });
+
+      it('should work with Bitbucket releases', async () => {
+        const config: RepoConfig = {
+          type: 'remote',
+          platform: Platform.BITBUCKET,
+          owner: 'owner',
+          repo: 'repo',
+        };
+
+        (bitbucketClient.getAllReleases as jest.Mock).mockResolvedValue([
+          { name: '1.0.0', date: '2024-01-01' },
+          { name: '2.0.0', date: '2024-01-02' },
+        ]);
+
+        const latest = await resolveLatestTag(config, undefined, 'release');
+        expect(latest).toBe('2.0.0');
+      });
+
+      it('should throw error when no releases found', async () => {
+        const config: RepoConfig = {
+          type: 'remote',
+          platform: Platform.GITHUB,
+          owner: 'owner',
+          repo: 'repo',
+        };
+
+        (githubClient.getAllReleases as jest.Mock).mockResolvedValue([]);
+
+        await expect(resolveLatestTag(config, undefined, 'release')).rejects.toThrow('No releases found');
+      });
+    });
   });
 });
 

@@ -4,16 +4,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
-Get tag information from local and remote repositories (GitHub, Gitea, Bitbucket). Supports both URL and separate input formats, with "latest" tag resolution using semver-first logic.
+Get tag and release information from local and remote repositories (GitHub, Gitea, Bitbucket). Supports both URL and separate input formats, with "latest" tag/release resolution using semver-first logic.
 
 ## Features
 
 - **Multi-platform support**: Works with GitHub, Gitea, and Bitbucket
 - **Local repositories**: Query tags from local git repositories
-- **Remote repositories**: Query tags via API from remote repositories
+- **Remote repositories**: Query tags and releases via API from remote repositories
+- **Tags and Releases**: Support for both git tags and platform releases
 - **Flexible input**: Support both URL format and separate inputs
-- **Latest tag resolution**: Automatically resolve "latest" tag using semver-first, date fallback strategy
-- **Comprehensive tag info**: Get tag SHA, commit SHA, tag type, message, and verification status
+- **Latest resolution**: Automatically resolve "latest" tag or release using semver-first, date fallback strategy
+- **Comprehensive info**: Get item SHA, commit SHA, item type, details, and verification status
 
 ## Usage
 
@@ -117,7 +118,7 @@ Or with a custom token:
     token: ${{ secrets.GITHUB_TOKEN }}
 
 - name: Use latest tag
-  run: echo "Latest tag is ${{ steps.tag-info.outputs.tag_name }}"
+  run: echo "Latest tag is ${{ steps.tag-info.outputs.name }}"
 ```
 
 ### Get Latest Tag with Format Filtering
@@ -134,7 +135,7 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
     tag_format: X.X  # Finds latest tag like "3.23" instead of "edge-e9613ab3-ls213"
 
 - name: Use latest version tag
-  run: echo "Latest version tag is ${{ steps.tag-info.outputs.tag_name }}"
+  run: echo "Latest version tag is ${{ steps.tag-info.outputs.name }}"
 ```
 
 **Format Pattern Types:**
@@ -273,6 +274,44 @@ This action supports flexible version pinning to balance stability and updates:
 
 > **Note**: Major and minor version tags (e.g., `v1`, `v1.0`) are automatically created/updated with each stable release to point to the latest patch version.
 
+### Get Release Information
+
+Query releases from remote repositories. Releases are not supported for local repositories.
+
+```yaml
+- name: Get release info
+  id: release-info
+  uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: v1.0.0
+    tag_type: release
+    repository: https://github.com/owner/repo
+    token: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Display release info
+  run: |
+    echo "Release: ${{ steps.release-info.outputs.name }}"
+    echo "SHA: ${{ steps.release-info.outputs.item_sha }}"
+    echo "Draft: ${{ steps.release-info.outputs.is_draft }}"
+    echo "Prerelease: ${{ steps.release-info.outputs.is_prerelease }}"
+```
+
+### Get Latest Release
+
+```yaml
+- name: Get latest release
+  id: release-info
+  uses: your-org/git-tag-info-action@v1
+  with:
+    tag_name: latest
+    tag_type: release
+    repository: https://github.com/owner/repo
+    token: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Use latest release
+  run: echo "Latest release is ${{ steps.release-info.outputs.name }}"
+```
+
 ### Using Outputs
 
 ```yaml
@@ -283,16 +322,17 @@ This action supports flexible version pinning to balance stability and updates:
     tag_name: v1.0.0
     repository: https://github.com/owner/repo
 
-- name: Check if tag exists
+- name: Check if item exists
   if: steps.tag-info.outputs.exists == 'true'
-  run: echo "Tag exists!"
+  run: echo "Item exists!"
 
 - name: Display tag info
   run: |
-    echo "Tag: ${{ steps.tag-info.outputs.tag_name }}"
-    echo "SHA: ${{ steps.tag-info.outputs.tag_sha }}"
+    echo "Name: ${{ steps.tag-info.outputs.name }}"
+    echo "SHA: ${{ steps.tag-info.outputs.item_sha }}"
     echo "Commit: ${{ steps.tag-info.outputs.commit_sha }}"
-    echo "Type: ${{ steps.tag-info.outputs.tag_type }}"
+    echo "Type: ${{ steps.tag-info.outputs.item_type }}"
+    echo "Details: ${{ steps.tag-info.outputs.details }}"
 ```
 
 ## Inputs
@@ -307,19 +347,22 @@ This action supports flexible version pinning to balance stability and updates:
 | `base_url` | Custom base URL for self-hosted instances (e.g., https://gitea.example.com) | No | - |
 | `token` | Custom Personal Access Token (works for all platforms). If not provided, automatically falls back to `GITHUB_TOKEN` environment variable when available (e.g., in GitHub Actions) | No | - |
 | `ignore_cert_errors` | Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). **Warning**: This is a security risk and should only be used with trusted self-hosted instances | No | `false` |
-| `tag_format` | Format pattern(s) to filter tags when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no tags, second pattern is tried, etc. Only tags matching the first successful format pattern will be considered when resolving "latest" | No | - |
+| `tag_type` | Type of item to fetch: `"tags"` (git tags) or `"release"` (platform releases). Releases are only supported for remote repositories (not local). Default: `"tags"` | No | `tags` |
+| `tag_format` | Format pattern(s) to filter tags/releases when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no items, second pattern is tried, etc. Only items matching the first successful format pattern will be considered when resolving "latest" | No | - |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| `exists` | Boolean indicating if tag exists |
-| `tag_name` | Tag name |
-| `tag_sha` | Tag SHA |
-| `tag_type` | Tag type (commit/annotated) |
+| `exists` | Boolean indicating if item exists |
+| `name` | Item name (tag name for tags/releases) |
+| `item_sha` | Item SHA (tag SHA for tags/releases) |
+| `item_type` | Item type (commit/tag/release) |
 | `commit_sha` | Commit SHA |
-| `tag_message` | Tag message |
-| `verified` | Whether tag is verified (if applicable) |
+| `details` | Item details (tag message or release body) |
+| `verified` | Whether item is verified (tags only, false for releases) |
+| `is_draft` | Whether release is a draft (releases only, false for tags) |
+| `is_prerelease` | Whether release is a prerelease (releases only, false for tags) |
 
 ## Workflow Examples
 
@@ -347,7 +390,7 @@ jobs:
           # No token needed - automatically uses GITHUB_TOKEN
 
       - name: Display tag
-        run: echo "Latest tag: ${{ steps.tag-info.outputs.tag_name }}"
+        run: echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
 ```
 
 ### Using Custom Personal Access Token
@@ -373,7 +416,7 @@ jobs:
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Custom PAT with access to other-org
 
       - name: Display tag
-        run: echo "Latest tag: ${{ steps.tag-info.outputs.tag_name }}"
+        run: echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
 ```
 
 ### Using Custom Token for Private Repositories
@@ -398,8 +441,8 @@ jobs:
 
       - name: Use tag info
         run: |
-          echo "Tag: ${{ steps.tag-info.outputs.tag_name }}"
-          echo "SHA: ${{ steps.tag-info.outputs.tag_sha }}"
+          echo "Tag: ${{ steps.tag-info.outputs.name }}"
+          echo "SHA: ${{ steps.tag-info.outputs.item_sha }}"
 ```
 
 ### Complete Workflow with Multiple Token Scenarios
@@ -444,24 +487,24 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Current repo latest: ${{ steps.current-repo.outputs.tag_name }}"
-          echo "External public latest: ${{ steps.external-public.outputs.tag_name }}"
-          echo "External private latest: ${{ steps.external-private.outputs.tag_name }}"
+          echo "Current repo latest: ${{ steps.current-repo.outputs.name }}"
+          echo "External public latest: ${{ steps.external-public.outputs.name }}"
+          echo "External private latest: ${{ steps.external-private.outputs.name }}"
 ```
 
-## Latest Tag Resolution
+## Latest Tag/Release Resolution
 
 When `tag_name` is set to `"latest"`, the action uses the following strategy:
 
-1. **Format Filtering** (if `tag_format` is provided): Filter tags to only those matching the specified format pattern(s)
+1. **Format Filtering** (if `tag_format` is provided): Filter tags/releases to only those matching the specified format pattern(s)
    - If `tag_format` is an array, patterns are tried in order as fallbacks
-   - First pattern that matches at least one tag is used
-   - If no patterns match any tags, the action fails with a clear error message
-2. **Semver First**: If semantic version tags exist (e.g., v1.2.3, 1.0.0), it selects the highest version
-3. **Date Fallback**: If no semver tags exist, it selects the most recent tag by creation date
+   - First pattern that matches at least one item is used
+   - If no patterns match any items, the action fails with a clear error message
+2. **Semver First**: If semantic version tags/releases exist (e.g., v1.2.3, 1.0.0), it selects the highest version
+3. **Date Fallback**: If no semver items exist, it selects the most recent item by creation/published date
 4. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
 
-**Note**: Format filtering happens before sorting, so only tags matching the format are considered. If `tag_format` is an array and no patterns match any tags, the action will fail with a clear error message listing all attempted patterns.
+**Note**: Format filtering happens before sorting, so only items matching the format are considered. If `tag_format` is an array and no patterns match any items, the action will fail with a clear error message listing all attempted patterns. For releases, the date used is the release published date.
 
 ## Repository Detection
 
@@ -475,6 +518,8 @@ Examples:
 - `./my-repo` → Local
 - `/absolute/path/to/repo` → Local
 - `git@github.com:owner/repo.git` → Remote (GitHub)
+
+**Important**: Releases are only supported for remote repositories. If you set `tag_type: release` with a local repository, the action will throw an error.
 
 ## Authentication
 

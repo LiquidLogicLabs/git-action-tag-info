@@ -1,24 +1,33 @@
 import * as core from '@actions/core';
-import { TagInfo, RepoConfig } from './types';
+import { ItemInfo, RepoConfig } from './types';
 import { detectRepository } from './repo-detector';
 import { getTagInfo as getLocalTagInfo } from './git-client';
-import { getTagInfo as getGithubTagInfo } from './github-client';
-import { getTagInfo as getGiteaTagInfo } from './gitea-client';
-import { getTagInfo as getBitbucketTagInfo } from './bitbucket-client';
+import { getTagInfo as getGithubTagInfo, getReleaseInfo as getGithubReleaseInfo } from './github-client';
+import { getTagInfo as getGiteaTagInfo, getReleaseInfo as getGiteaReleaseInfo } from './gitea-client';
+import { getTagInfo as getBitbucketTagInfo, getReleaseInfo as getBitbucketReleaseInfo } from './bitbucket-client';
 import { resolveLatestTag } from './tag-resolver';
 import { Platform } from './types';
 import { parseTagFormat } from './format-parser';
 
 /**
- * Get tag information based on repository configuration
+ * Get item information (tag or release) based on repository configuration
  */
-async function getTagInfoFromRepo(
+async function getItemInfoFromRepo(
   tagName: string,
-  config: RepoConfig
-): Promise<TagInfo> {
+  config: RepoConfig,
+  itemType: 'tags' | 'release'
+): Promise<ItemInfo> {
+  // Validate: releases are not supported for local repositories
+  if (itemType === 'release' && config.type === 'local') {
+    throw new Error('Releases are not supported for local repositories. Use tag_type: tags or query a remote repository.');
+  }
+
   if (config.type === 'local') {
     if (!config.path) {
       throw new Error('Local repository path is required');
+    }
+    if (itemType === 'release') {
+      throw new Error('Releases are not supported for local repositories');
     }
     return getLocalTagInfo(tagName, config.path);
   }
@@ -28,37 +37,74 @@ async function getTagInfoFromRepo(
       throw new Error('Remote repository configuration is incomplete');
     }
 
-    switch (config.platform) {
-      case Platform.GITHUB:
-        return await getGithubTagInfo(
-          tagName,
-          config.owner,
-          config.repo,
-          config.token,
-          config.ignoreCertErrors
-        );
-      case Platform.GITEA:
-        if (!config.baseUrl) {
-          throw new Error('Gitea base URL is required');
-        }
-        return await getGiteaTagInfo(
-          tagName,
-          config.owner,
-          config.repo,
-          config.baseUrl,
-          config.token,
-          config.ignoreCertErrors
-        );
-      case Platform.BITBUCKET:
-        return await getBitbucketTagInfo(
-          tagName,
-          config.owner,
-          config.repo,
-          config.token,
-          config.ignoreCertErrors
-        );
-      default:
-        throw new Error(`Unsupported platform: ${config.platform}`);
+    if (itemType === 'release') {
+      // Route to release functions
+      switch (config.platform) {
+        case Platform.GITHUB:
+          return await getGithubReleaseInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.token,
+            config.ignoreCertErrors
+          );
+        case Platform.GITEA:
+          if (!config.baseUrl) {
+            throw new Error('Gitea base URL is required');
+          }
+          return await getGiteaReleaseInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.baseUrl,
+            config.token,
+            config.ignoreCertErrors
+          );
+        case Platform.BITBUCKET:
+          return await getBitbucketReleaseInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.token,
+            config.ignoreCertErrors
+          );
+        default:
+          throw new Error(`Unsupported platform: ${config.platform}`);
+      }
+    } else {
+      // Route to tag functions
+      switch (config.platform) {
+        case Platform.GITHUB:
+          return await getGithubTagInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.token,
+            config.ignoreCertErrors
+          );
+        case Platform.GITEA:
+          if (!config.baseUrl) {
+            throw new Error('Gitea base URL is required');
+          }
+          return await getGiteaTagInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.baseUrl,
+            config.token,
+            config.ignoreCertErrors
+          );
+        case Platform.BITBUCKET:
+          return await getBitbucketTagInfo(
+            tagName,
+            config.owner,
+            config.repo,
+            config.token,
+            config.ignoreCertErrors
+          );
+        default:
+          throw new Error(`Unsupported platform: ${config.platform}`);
+      }
     }
   }
 
@@ -72,6 +118,7 @@ async function run(): Promise<void> {
   try {
     // Read inputs
     const tagName = core.getInput('tag_name', { required: true });
+    const tagType = core.getInput('tag_type') || 'tags'; // Default to 'tags'
     const repository = core.getInput('repository');
     const platform = core.getInput('platform');
     const owner = core.getInput('owner');
@@ -82,6 +129,11 @@ async function run(): Promise<void> {
     const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
     const tagFormatInput = core.getInput('tag_format') || undefined;
     const tagFormat = parseTagFormat(tagFormatInput);
+
+    // Validate tag_type input
+    if (tagType !== 'tags' && tagType !== 'release') {
+      throw new Error(`Invalid tag_type: ${tagType}. Must be 'tags' or 'release'`);
+    }
 
     // Warn if certificate errors are being ignored (security risk)
     if (ignoreCertErrors) {
@@ -108,39 +160,51 @@ async function run(): Promise<void> {
     );
 
     core.info(
-      `Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}`
+      `Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`
     );
 
-    // Resolve "latest" tag if needed
+    // Resolve "latest" tag/release if needed
     let resolvedTagName = tagName;
     if (tagName.toLowerCase() === 'latest') {
-      core.info('Resolving latest tag...');
-      resolvedTagName = await resolveLatestTag(repoConfig, tagFormat);
-      core.info(`Resolved latest tag: ${resolvedTagName}`);
+      const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+      core.info(`Resolving latest ${itemTypeLabel}...`);
+      resolvedTagName = await resolveLatestTag(repoConfig, tagFormat, tagType);
+      core.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
     }
 
-    // Get tag information
-    core.info(`Fetching tag information for: ${resolvedTagName}`);
-    const tagInfo = await getTagInfoFromRepo(resolvedTagName, repoConfig);
+    // Get item information (tag or release)
+    const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+    core.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
+    const itemInfo = await getItemInfoFromRepo(resolvedTagName, repoConfig, tagType);
 
-    // Set outputs
-    core.setOutput('exists', tagInfo.exists.toString());
-    core.setOutput('tag_name', tagInfo.tag_name);
-    core.setOutput('tag_sha', tagInfo.tag_sha);
-    core.setOutput('tag_type', tagInfo.tag_type);
-    core.setOutput('commit_sha', tagInfo.commit_sha);
-    core.setOutput('tag_message', tagInfo.tag_message);
-    core.setOutput('verified', tagInfo.verified.toString());
+    // Set outputs with normalized field names
+    core.setOutput('exists', itemInfo.exists.toString());
+    core.setOutput('name', itemInfo.name);
+    core.setOutput('item_sha', itemInfo.item_sha);
+    core.setOutput('item_type', itemInfo.item_type);
+    core.setOutput('commit_sha', itemInfo.commit_sha);
+    core.setOutput('details', itemInfo.details);
+    core.setOutput('verified', itemInfo.verified.toString());
+    core.setOutput('is_draft', itemInfo.is_draft.toString());
+    core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
 
-    if (!tagInfo.exists) {
-      core.warning(`Tag "${resolvedTagName}" does not exist in the repository`);
+    if (!itemInfo.exists) {
+      core.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
     } else {
-      core.info(`Tag "${resolvedTagName}" found successfully`);
-      core.info(`  SHA: ${tagInfo.tag_sha}`);
-      core.info(`  Type: ${tagInfo.tag_type}`);
-      core.info(`  Commit: ${tagInfo.commit_sha}`);
-      if (tagInfo.tag_message) {
-        core.info(`  Message: ${tagInfo.tag_message.substring(0, 100)}...`);
+      core.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
+      core.info(`  Name: ${itemInfo.name}`);
+      core.info(`  SHA: ${itemInfo.item_sha}`);
+      core.info(`  Type: ${itemInfo.item_type}`);
+      core.info(`  Commit: ${itemInfo.commit_sha}`);
+      if (itemInfo.details) {
+        core.info(`  Details: ${itemInfo.details.substring(0, 100)}...`);
+      }
+      if (tagType === 'release') {
+        core.info(`  Draft: ${itemInfo.is_draft}`);
+        core.info(`  Prerelease: ${itemInfo.is_prerelease}`);
+      }
+      if (tagType === 'tags' && itemInfo.verified) {
+        core.info(`  Verified: ${itemInfo.verified}`);
       }
     }
   } catch (error) {

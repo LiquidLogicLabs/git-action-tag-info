@@ -16,6 +16,8 @@ This document outlines best practices for creating GitHub/Gitea Actions based on
 - `CHANGELOG.md` - Keep a Changelog format (optional - only if you want to maintain a changelog file)
 - `README.md` - Comprehensive documentation with badges and examples
 - `.gitignore` - Organized by category (dependencies, build outputs, IDE, OS files, etc.)
+- `.devcontainer/` - Dev container configuration (recommended for consistent development environment)
+- `.eslintrc.json` - ESLint configuration with ignore patterns (not CLI flags)
 
 ### Directory Structure
 
@@ -27,6 +29,10 @@ action-name/
 ├── CHANGELOG.md            # Keep a Changelog format
 ├── README.md               # Documentation with badges
 ├── .gitignore              # Organized ignore patterns
+├── .eslintrc.json          # ESLint configuration
+├── .devcontainer/          # Dev container configuration
+│   ├── devcontainer.json  # Container definition
+│   └── README.md          # Dev container usage instructions
 ├── src/                    # TypeScript source code
 │   ├── index.ts           # Main entry point
 │   ├── types.ts           # TypeScript type definitions
@@ -37,7 +43,10 @@ action-name/
 │   └── workflows/
 │       ├── ci.yml         # CI workflow (calls test.yml)
 │       ├── test.yml       # Reusable test workflow
-│       └── release.yml     # Release workflow (validation, package, release)
+│       ├── release.yml     # Release workflow (validation, package, release)
+│       └── .act/          # Act event files for local testing
+│           ├── event-workflow_call.json
+│           └── event-release.json
 └── scripts/                # Optional helper scripts
     └── [helper].js        # Release/build helpers
 ```
@@ -148,17 +157,40 @@ branding:
 
 ### Required Scripts
 
+**Core Scripts (all Node.js actions should have):**
+
 ```json
 {
   "scripts": {
     "build": "tsc && ncc build src/index.ts -o dist --source-map --license licenses.txt",
     "package": "npm run build",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\""
   }
 }
 ```
+
+**Act Scripts (for actions with workflows):**
+
+```json
+{
+  "scripts": {
+    "test:act": "act -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json",
+    "test:act:verbose": "act -W .github/workflows/test.yml --eventpath .github/workflows/.act/event-workflow_call.json -v",
+    "test:act:ci": "act -W .github/workflows/ci.yml",
+    "test:act:release": "act push --eventpath .github/workflows/.act/event-release.json",
+    "lint:act": "act -W .github/workflows/ci.yml -j lint"
+  }
+}
+```
+
+**Key Points:**
+- `test:watch` and `test:coverage` should be included for better developer experience
+- Act scripts enable local workflow testing without pushing to GitHub
+- All act scripts require `.github/workflows/.act/` directory with event JSON files
 
 ### Dependencies
 
@@ -745,6 +777,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use ESLint with TypeScript rules
 - Configure in `.eslintrc.json`
+- **Ignore patterns should be in `.eslintrc.json` (not CLI flags)**
+  ```json
+  {
+    "ignorePatterns": ["dist/**", "node_modules/**", "*.js", "**/__tests__/**", "**/*.test.ts"]
+  }
+  ```
+- Keep lint command simple: `"lint": "eslint src/**/*.ts"`
 - Run `npm run lint` in CI
 
 ### Formatting
@@ -759,6 +798,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use Jest with ts-jest
 - Place tests in `src/__tests__/` or alongside source files
 - Use `continue-on-error: true` in CI if tests are optional
+
+## Dev Container Configuration
+
+### Overview
+
+Dev containers provide a consistent development environment across all team members and match the CI/CD environment.
+
+### Structure
+
+Create `.devcontainer/devcontainer.json`:
+
+```json
+{
+  "name": "Action Name",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "firsttris.vscode-jest-runner",
+        "orta.vscode-jest"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true,
+        "jest.autoRun": "off",
+        "jest.showCoverageOnLoad": false
+      }
+    }
+  },
+
+  "postCreateCommand": "npm install",
+  
+  "remoteUser": "node",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ]
+}
+```
+
+### Key Points
+
+- **Node.js 20**: Matches CI/CD environment
+- **Git & GitHub CLI**: Required for integration tests and git operations
+- **VS Code Extensions**: ESLint, Prettier, TypeScript, Jest Runner
+- **Auto-install**: Dependencies are automatically installed on container creation
+- **For Yarn projects**: Change `postCreateCommand` to `"yarn install"`
+
+### Act Integration
+
+Add `.github/workflows/.act/` directory with event JSON files for local workflow testing:
+
+- `event-workflow_call.json` - For testing reusable workflows
+- `event-release.json` - For testing release workflows
 
 ## Security Best Practices
 

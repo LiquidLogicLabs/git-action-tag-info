@@ -559,6 +559,13 @@ For self-hosted instances (especially Gitea) that use self-signed SSL certificat
 - Repository URLs are validated before use
 - No credentials are stored or cached
 
+## Documentation
+
+For developers and contributors:
+
+- **[Development Guide](docs/DEVELOPMENT.md)** - Setup, development workflow, and contributing guidelines
+- **[Testing Guide](docs/TESTING.md)** - Complete testing documentation
+
 ## License
 
 MIT

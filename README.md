@@ -1,6 +1,6 @@
 # Get Tag Info Action
 
-[![CI](https://github.com/LiquidLogicLabs/git-tag-info-action/actions/workflows/ci.yml/badge.svg)](https://github.com/LiquidLogicLabs/git-tag-info-action/actions/workflows/ci.yml)
+[![CI](https://github.com/LiquidLogicLabs/git-action-tag-info/actions/workflows/ci.yml/badge.svg)](https://github.com/LiquidLogicLabs/git-action-tag-info/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
@@ -260,17 +260,17 @@ This action supports flexible version pinning to balance stability and updates:
 **Major Version** (`@v1`):
 - Automatically updates to the latest `v1.x.x` release
 - Recommended for most users who want bug fixes and minor updates
-- Example: `uses: LiquidLogicLabs/git-tag-info-action@v1`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1`
 
 **Minor Version** (`@v1.0`):
 - Automatically updates to the latest `v1.0.x` patch release
 - Recommended when you want to stay on a specific minor version
-- Example: `uses: LiquidLogicLabs/git-tag-info-action@v1.0`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.0`
 
 **Exact Version** (`@v1.0.3`):
 - Pins to a specific release
 - Recommended for production workflows requiring maximum stability
-- Example: `uses: LiquidLogicLabs/git-tag-info-action@v1.0.3`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.0.3`
 
 > **Note**: Major and minor version tags (e.g., `v1`, `v1.0`) are automatically created/updated with each stable release to point to the latest patch version.
 
@@ -349,6 +349,7 @@ Query releases from remote repositories. Releases are not supported for local re
 | `ignore_cert_errors` | Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). **Warning**: This is a security risk and should only be used with trusted self-hosted instances | No | `false` |
 | `tag_type` | Type of item to fetch: `"tags"` (git tags) or `"release"` (platform releases). Releases are only supported for remote repositories (not local). Default: `"tags"` | No | `tags` |
 | `tag_format` | Format pattern(s) to filter tags/releases when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no items, second pattern is tried, etc. Only items matching the first successful format pattern will be considered when resolving "latest" | No | - |
+| `verbose` | Enable verbose debug logging (prints `[DEBUG] ...` messages) | No | `false` |
 
 ## Outputs
 
@@ -383,7 +384,7 @@ jobs:
     steps:
       - name: Get tag info
         id: tag-info
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: latest
           repository: https://github.com/owner/repo
@@ -409,7 +410,7 @@ jobs:
     steps:
       - name: Get tag info from external repository
         id: tag-info
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: latest
           repository: https://github.com/other-org/other-repo
@@ -433,7 +434,7 @@ jobs:
     steps:
       - name: Get tag info from private repository
         id: tag-info
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: v1.0.0
           repository: https://github.com/private-org/private-repo
@@ -462,7 +463,7 @@ jobs:
       # Current repo - uses default GITHUB_TOKEN
       - name: Get tag from current repo
         id: current-repo
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: latest
           # No token - uses GITHUB_TOKEN automatically
@@ -470,7 +471,7 @@ jobs:
       # External public repo - uses default GITHUB_TOKEN
       - name: Get tag from external public repo
         id: external-public
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: latest
           repository: https://github.com/actions/checkout
@@ -479,7 +480,7 @@ jobs:
       # External private repo - requires custom token
       - name: Get tag from external private repo
         id: external-private
-        uses: LiquidLogicLabs/git-tag-info-action@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v1
         with:
           tag_name: latest
           repository: https://github.com/private-org/private-repo

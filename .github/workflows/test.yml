@@ -1,13 +1,17 @@
 name: Test
 
 on:
-  workflow_call:  # Only workflow_call - no direct triggers
+  workflow_call:  # Called by CI workflow
+  workflow_dispatch:  # Allow manual triggering
 
 permissions:
   contents: read
 
 jobs:
   test:
+    # Always run when called via workflow_call or workflow_dispatch
+    # This workflow only has workflow_call and workflow_dispatch triggers, so it should always run
+    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -25,9 +29,14 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run tests
-        run: npm test
-        continue-on-error: true  # Optional: don't fail if tests are missing
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Run e2e tests
+        run: npm run test:e2e
 
       # Integration tests - Test the action itself
       - name: Test action - Default GITHUB_TOKEN (no token input)
@@ -37,7 +46,6 @@ jobs:
           tag_name: latest
           repository: https://github.com/actions/checkout
           # No token provided - should use GITHUB_TOKEN automatically
-        continue-on-error: true
 
       - name: Test action - Explicit GITHUB_TOKEN
         id: test-explicit-token
@@ -46,7 +54,6 @@ jobs:
           tag_name: latest
           repository: https://github.com/actions/checkout
           token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       - name: Test action - Custom token (if available)
         id: test-custom-token
@@ -55,9 +62,8 @@ jobs:
           tag_name: latest
           repository: https://github.com/actions/checkout
           token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-        continue-on-error: true
-        # Note: This test will be skipped if CUSTOM_GITHUB_TOKEN secret is not configured
-        # To enable this test, add CUSTOM_GITHUB_TOKEN to repository secrets
+        if: secrets.CUSTOM_GITHUB_TOKEN != ''
+        # Note: To enable this test, add CUSTOM_GITHUB_TOKEN to repository secrets
 
       - name: Test action - Self-hosted Gitea with ignore_cert_errors
         id: test-self-hosted
@@ -67,7 +73,7 @@ jobs:
           repository: https://git.ravenwolf.org/github/traefik
           base_url: https://git.ravenwolf.org
           ignore_cert_errors: true
-        continue-on-error: true
+        if: vars.TEST_GITEA_URL != ''
 
       - name: Integration test summary
         if: always()

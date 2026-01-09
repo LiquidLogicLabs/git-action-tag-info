@@ -34,6 +34,10 @@ inputs:
     description: 'Type of item to fetch: "tags" (git tags) or "release" (platform releases). Default: "tags"'
     required: false
     default: 'tags'
+  verbose:
+    description: 'Enable verbose debug logging'
+    required: false
+    default: 'false'
 outputs:
   exists:
     description: 'Boolean indicating if item exists'

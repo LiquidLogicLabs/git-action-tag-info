@@ -28670,6 +28670,7 @@ const bitbucket_client_1 = __nccwpck_require__(1420);
 const tag_resolver_1 = __nccwpck_require__(7722);
 const types_1 = __nccwpck_require__(8522);
 const format_parser_1 = __nccwpck_require__(9594);
+const logger_1 = __nccwpck_require__(6999);
 /**
  * Get item information (tag or release) based on repository configuration
  */
@@ -28744,33 +28745,35 @@ async function run() {
         const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
         const tagFormatInput = core.getInput('tag_format') || undefined;
         const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
+        const verbose = core.getBooleanInput('verbose');
+        const logger = new logger_1.Logger(verbose);
         // Validate tag_type input
         if (tagType !== 'tags' && tagType !== 'release') {
             throw new Error(`Invalid tag_type: ${tagType}. Must be 'tags' or 'release'`);
         }
         // Warn if certificate errors are being ignored (security risk)
         if (ignoreCertErrors) {
-            core.warning('SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.');
+            logger.warning('SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.');
         }
         // Mask token in logs
         if (token) {
             core.setSecret(token);
         }
         // Detect repository configuration
-        core.info('Detecting repository configuration...');
+        logger.info('Detecting repository configuration...');
         const repoConfig = (0, repo_detector_1.detectRepository)(repository, platform, owner, repo, baseUrl, token, ignoreCertErrors);
-        core.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`);
+        logger.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`);
         // Resolve "latest" tag/release if needed
         let resolvedTagName = tagName;
         if (tagName.toLowerCase() === 'latest') {
             const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
-            core.info(`Resolving latest ${itemTypeLabel}...`);
+            logger.info(`Resolving latest ${itemTypeLabel}...`);
             resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig, tagFormat, tagType);
-            core.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
+            logger.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
         }
         // Get item information (tag or release)
         const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
-        core.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
+        logger.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
         const itemInfo = await getItemInfoFromRepo(resolvedTagName, repoConfig, tagType);
         // Set outputs with normalized field names
         core.setOutput('exists', itemInfo.exists.toString());
@@ -28783,23 +28786,23 @@ async function run() {
         core.setOutput('is_draft', itemInfo.is_draft.toString());
         core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
         if (!itemInfo.exists) {
-            core.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
+            logger.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
         }
         else {
-            core.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
-            core.info(`  Name: ${itemInfo.name}`);
-            core.info(`  SHA: ${itemInfo.item_sha}`);
-            core.info(`  Type: ${itemInfo.item_type}`);
-            core.info(`  Commit: ${itemInfo.commit_sha}`);
+            logger.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
+            logger.debug(`Name: ${itemInfo.name}`);
+            logger.debug(`SHA: ${itemInfo.item_sha}`);
+            logger.debug(`Type: ${itemInfo.item_type}`);
+            logger.debug(`Commit: ${itemInfo.commit_sha}`);
             if (itemInfo.details) {
-                core.info(`  Details: ${itemInfo.details.substring(0, 100)}...`);
+                logger.debug(`Details: ${itemInfo.details.substring(0, 100)}...`);
             }
             if (tagType === 'release') {
-                core.info(`  Draft: ${itemInfo.is_draft}`);
-                core.info(`  Prerelease: ${itemInfo.is_prerelease}`);
+                logger.debug(`Draft: ${itemInfo.is_draft}`);
+                logger.debug(`Prerelease: ${itemInfo.is_prerelease}`);
             }
             if (tagType === 'tags' && itemInfo.verified) {
-                core.info(`  Verified: ${itemInfo.verified}`);
+                logger.debug(`Verified: ${itemInfo.verified}`);
             }
         }
     }
@@ -28814,6 +28817,83 @@ async function run() {
 }
 // Run the action
 run();
+
+
+/***/ }),
+
+/***/ 6999:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Logger = void 0;
+const core = __importStar(__nccwpck_require__(7484));
+/**
+ * Logger utility with verbose/debug support
+ * Provides consistent logging across the action
+ */
+class Logger {
+    verbose;
+    constructor(verbose = false) {
+        this.verbose = verbose;
+    }
+    info(message) {
+        core.info(message);
+    }
+    warning(message) {
+        core.warning(message);
+    }
+    error(message) {
+        core.error(message);
+    }
+    /**
+     * Log a debug message - uses core.info() when verbose is true so it always shows
+     * Falls back to core.debug() when verbose is false (for when ACTIONS_STEP_DEBUG is set)
+     */
+    debug(message) {
+        if (this.verbose) {
+            core.info(`[DEBUG] ${message}`);
+        }
+        else {
+            core.debug(message);
+        }
+    }
+}
+exports.Logger = Logger;
 
 
 /***/ }),

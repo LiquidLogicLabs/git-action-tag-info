@@ -4,50 +4,45 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Semver tags only
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
   pull-requests: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  ci:
+    uses: ./.github/workflows/ci.yml
+    # CI runs: lint -> unit tests + integration tests
+    # When manually triggered, checkout the specified tag
+    secrets: inherit
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-  test:
-    uses: ./.github/workflows/test.yml
+  e2e-tests:
+    needs: ci
+    uses: ./.github/workflows/e2e-tests.yml
+    secrets: inherit
 
   release:
-    needs: [lint, test]  # REQUIRED: Lint and tests must pass before release
+    needs: [ci, e2e-tests]  # REQUIRED: CI and E2E tests must pass before release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for changelog generation
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Check version format in tag
+      - name: Parse and validate version tag
         id: version
-        uses: nowsprinting/check-version-format-action@v4
+        uses: LiquidLogicLabs/git-tag-validate-version-action@v1
         with:
-          prefix: 'v'
+          tag: ${{ github.event.inputs.tag || github.ref_name }}
+          versionType: 'auto'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,29 +69,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create/Update Major, Minor, and Latest Version Tags
-        if: steps.version.outputs.is_stable == 'true'
-        uses: simbo/action-semver-release-action@latest
+        if: steps.version.outputs.hasPrerelease != 'true' && steps.version.outputs.isValid == 'true'
+        uses: LiquidLogicLabs/git-floating-version-tags-action@v1
         with:
-          create-release: false  # We handle release creation separately with changelog
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.event.inputs.tag || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
+        uses: LiquidLogicLabs/git-action-release@v1
         with:
-          tag: ${{ github.ref_name }}
-          name: Release ${{ steps.version.outputs.full_without_prefix }}
+          tag: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Release ${{ steps.version.outputs.version }}
           body: ${{ steps.release_notes.outputs.changelog }}
           draft: false
-          prerelease: ${{ steps.version.outputs.is_stable != 'true' }}
+          prerelease: ${{ steps.version.outputs.hasPrerelease == 'true' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release Summary
         run: |
           echo "## 🎉 Release Complete!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ steps.version.outputs.full_without_prefix }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub Release**: [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.version.outputs.is_stable }}" != "true" ]; then
+          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.tag || github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.version.outputs.hasPrerelease }}" == "true" ]; then
             echo "- **Status**: ⚠️ Pre-release (for testing)" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **Status**: ✅ Stable release" >> $GITHUB_STEP_SUMMARY

@@ -8,6 +8,7 @@ import { getTagInfo as getBitbucketTagInfo, getReleaseInfo as getBitbucketReleas
 import { resolveLatestTag } from './tag-resolver';
 import { Platform } from './types';
 import { parseTagFormat } from './format-parser';
+import { Logger } from './logger';
 
 /**
  * Get item information (tag or release) based on repository configuration
@@ -129,6 +130,8 @@ async function run(): Promise<void> {
     const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
     const tagFormatInput = core.getInput('tag_format') || undefined;
     const tagFormat = parseTagFormat(tagFormatInput);
+    const verbose = core.getBooleanInput('verbose');
+    const logger = new Logger(verbose);
 
     // Validate tag_type input
     if (tagType !== 'tags' && tagType !== 'release') {
@@ -137,7 +140,7 @@ async function run(): Promise<void> {
 
     // Warn if certificate errors are being ignored (security risk)
     if (ignoreCertErrors) {
-      core.warning(
+      logger.warning(
         'SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.'
       );
     }
@@ -148,7 +151,7 @@ async function run(): Promise<void> {
     }
 
     // Detect repository configuration
-    core.info('Detecting repository configuration...');
+    logger.info('Detecting repository configuration...');
     const repoConfig = detectRepository(
       repository,
       platform,
@@ -159,22 +162,20 @@ async function run(): Promise<void> {
       ignoreCertErrors
     );
 
-    core.info(
-      `Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`
-    );
+    logger.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`);
 
     // Resolve "latest" tag/release if needed
     let resolvedTagName = tagName;
     if (tagName.toLowerCase() === 'latest') {
       const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
-      core.info(`Resolving latest ${itemTypeLabel}...`);
+      logger.info(`Resolving latest ${itemTypeLabel}...`);
       resolvedTagName = await resolveLatestTag(repoConfig, tagFormat, tagType);
-      core.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
+      logger.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
     }
 
     // Get item information (tag or release)
     const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
-    core.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
+    logger.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
     const itemInfo = await getItemInfoFromRepo(resolvedTagName, repoConfig, tagType);
 
     // Set outputs with normalized field names
@@ -189,22 +190,26 @@ async function run(): Promise<void> {
     core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
 
     if (!itemInfo.exists) {
-      core.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
+      logger.warning(
+        `${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`
+      );
     } else {
-      core.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
-      core.info(`  Name: ${itemInfo.name}`);
-      core.info(`  SHA: ${itemInfo.item_sha}`);
-      core.info(`  Type: ${itemInfo.item_type}`);
-      core.info(`  Commit: ${itemInfo.commit_sha}`);
+      logger.info(
+        `${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`
+      );
+      logger.debug(`Name: ${itemInfo.name}`);
+      logger.debug(`SHA: ${itemInfo.item_sha}`);
+      logger.debug(`Type: ${itemInfo.item_type}`);
+      logger.debug(`Commit: ${itemInfo.commit_sha}`);
       if (itemInfo.details) {
-        core.info(`  Details: ${itemInfo.details.substring(0, 100)}...`);
+        logger.debug(`Details: ${itemInfo.details.substring(0, 100)}...`);
       }
       if (tagType === 'release') {
-        core.info(`  Draft: ${itemInfo.is_draft}`);
-        core.info(`  Prerelease: ${itemInfo.is_prerelease}`);
+        logger.debug(`Draft: ${itemInfo.is_draft}`);
+        logger.debug(`Prerelease: ${itemInfo.is_prerelease}`);
       }
       if (tagType === 'tags' && itemInfo.verified) {
-        core.info(`  Verified: ${itemInfo.verified}`);
+        logger.debug(`Verified: ${itemInfo.verified}`);
       }
     }
   } catch (error) {

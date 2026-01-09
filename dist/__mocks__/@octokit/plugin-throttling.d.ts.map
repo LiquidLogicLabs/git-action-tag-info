@@ -1,1 +1,1 @@
-{"version":3,"file":"plugin-throttling.d.ts","sourceRoot":"","sources":["file:///home/ravenwolf.org/sanderson/source/git/LiquidLogicLabs/actions/git-tag-info-action/src/__mocks__/@octokit/plugin-throttling.ts"],"names":[],"mappings":"AACA,eAAO,MAAM,UAAU,YAAW,CAAC"}
+{"version":3,"file":"plugin-throttling.d.ts","sourceRoot":"","sources":["file:///home/ravenwolf.org/sanderson/source/git/LiquidLogicLabs/actions/git-action-tag-info/src/__mocks__/@octokit/plugin-throttling.ts"],"names":[],"mappings":"AACA,eAAO,MAAM,UAAU,YAAW,CAAC"}

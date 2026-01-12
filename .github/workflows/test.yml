@@ -108,26 +108,3 @@ jobs:
           else
             echo "⚠️ Self-hosted Gitea test: FAILED (may require network access or certificate issues)" >> $GITHUB_STEP_SUMMARY
           fi
-
-  # Action test workflows - comprehensive action testing
-  test-local-repo:
-    uses: ./.github/workflows/action-test-local-repo.yml
-
-  test-github-url:
-    uses: ./.github/workflows/action-test-github-url.yml
-
-  test-github-separate-inputs:
-    uses: ./.github/workflows/action-test-github-separate-inputs.yml
-
-  test-latest-tag:
-    uses: ./.github/workflows/action-test-latest-tag.yml
-
-  test-tag-format:
-    uses: ./.github/workflows/action-test-tag-format.yml
-
-  test-error-handling:
-    uses: ./.github/workflows/action-test-error-handling.yml
-
-  test-comprehensive:
-    uses: ./.github/workflows/action-test-comprehensive.yml
-

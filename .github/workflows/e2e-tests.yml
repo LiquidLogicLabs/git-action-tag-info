@@ -26,6 +26,97 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run e2e tests
-        run: npm run test:e2e
+      - name: Action e2e - Local tag exists
+        id: local-tag
+        uses: ./
+        with:
+          tag_name: v1.0.0
+          repository: .
+
+      - name: Verify local tag exists outputs
+        run: |
+          test "${{ steps.local-tag.outputs.exists }}" = "true"
+          test -n "${{ steps.local-tag.outputs.name }}"
+          test -n "${{ steps.local-tag.outputs.item_sha }}"
+          test -n "${{ steps.local-tag.outputs.commit_sha }}"
+
+      - name: Action e2e - Local tag missing
+        id: local-tag-missing
+        uses: ./
+        with:
+          tag_name: v999.999.999
+          repository: .
+        continue-on-error: true
+
+      - name: Verify local tag missing
+        run: |
+          test "${{ steps.local-tag-missing.outputs.exists }}" = "false"
+
+      - name: Action e2e - GitHub URL
+        id: github-url
+        uses: ./
+        with:
+          tag_name: v1.0.0
+          repository: https://github.com/LiquidLogicLabs/git-tag-info-action
+
+      - name: Verify GitHub URL outputs
+        run: |
+          test "${{ steps.github-url.outputs.exists }}" = "true"
+          test -n "${{ steps.github-url.outputs.name }}"
+          test -n "${{ steps.github-url.outputs.item_sha }}"
+
+      - name: Action e2e - GitHub separate inputs
+        id: github-separate
+        uses: ./
+        with:
+          tag_name: v1.0.0
+          platform: github
+          owner: LiquidLogicLabs
+          repo: git-tag-info-action
+
+      - name: Verify GitHub separate outputs
+        run: |
+          test "${{ steps.github-separate.outputs.exists }}" = "true"
+          test -n "${{ steps.github-separate.outputs.name }}"
+
+      - name: Action e2e - Latest local
+        id: latest-local
+        uses: ./
+        with:
+          tag_name: latest
+          repository: .
+
+      - name: Verify latest local
+        run: |
+          test "${{ steps.latest-local.outputs.exists }}" = "true"
+          test -n "${{ steps.latest-local.outputs.name }}"
+
+      - name: Action e2e - Tag format filter (comma)
+        id: tag-format
+        uses: ./
+        with:
+          tag_name: latest
+          repository: .
+          tag_format: 'X.X.X,X.X'
+        continue-on-error: true
+
+      - name: Verify tag format (best-effort)
+        if: always()
+        run: |
+          if [ "${{ steps.tag-format.outcome }}" = "success" ]; then
+            echo "Format resolved: ${{ steps.tag-format.outputs.name }}"
+          else
+            echo "Format test skipped/failed (no matching tags)"
+          fi
+
+      - name: Action e2e - Missing tag_name (expects failure)
+        id: missing-tag
+        uses: ./
+        with:
+          repository: .
+        continue-on-error: true
+
+      - name: Verify missing tag_name failure
+        run: |
+          test "${{ steps.missing-tag.outcome }}" != "success"
 

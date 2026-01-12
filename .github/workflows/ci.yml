@@ -38,8 +38,11 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Build
+        run: npm run build
+
   test:
-    # test.yml has its own condition and only supports workflow_call and workflow_dispatch
-    # When ci.yml is triggered by push/PR/workflow_call, calling test.yml via workflow_call will work
-    # test.yml will handle the condition checking internally
+    # No conditions needed - workflow trigger handles filtering
+    needs: lint  # Tests run after lint
     uses: ./.github/workflows/test.yml
+    # test.yml runs: unit tests + integration tests (all tests except E2E)

@@ -9,9 +9,7 @@ permissions:
 
 jobs:
   test:
-    # Always run when called via workflow_call or workflow_dispatch
-    # This workflow only has workflow_call and workflow_dispatch triggers, so it should always run
-    if: github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch'
+    # Always run - this workflow only has workflow_call and workflow_dispatch triggers
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -62,18 +60,17 @@ jobs:
           tag_name: latest
           repository: https://github.com/actions/checkout
           token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-        if: secrets.CUSTOM_GITHUB_TOKEN != ''
         # Note: To enable this test, add CUSTOM_GITHUB_TOKEN to repository secrets
 
       - name: Test action - Self-hosted Gitea with ignore_cert_errors
         id: test-self-hosted
+        if: ${{ vars.TEST_GITEA_URL != '' }}
         uses: ./
         with:
           tag_name: latest
           repository: https://git.ravenwolf.org/github/traefik
           base_url: https://git.ravenwolf.org
           ignore_cert_errors: true
-        if: vars.TEST_GITEA_URL != ''
 
       - name: Integration test summary
         if: always()

@@ -27173,7 +27173,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 1420:
+/***/ 2973:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -27212,247 +27212,97 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getTagInfo = getTagInfo;
-exports.getAllTags = getAllTags;
-exports.getReleaseInfo = getReleaseInfo;
-exports.getAllReleaseNames = getAllReleaseNames;
-exports.getAllReleases = getAllReleases;
-const https = __importStar(__nccwpck_require__(5692));
+exports.getInputs = getInputs;
+exports.resolveToken = resolveToken;
+const core = __importStar(__nccwpck_require__(7484));
 const types_1 = __nccwpck_require__(8522);
+const format_parser_1 = __nccwpck_require__(9594);
 /**
- * Make HTTP request
+ * Parse boolean input with default value
  */
-function httpRequest(url, token, method = 'GET', ignoreCertErrors = false) {
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(url);
-        const headers = {
-            'User-Agent': 'git-tag-info-action',
-            Accept: 'application/json',
-        };
-        if (token) {
-            // Bitbucket uses Basic Auth with app password or token
-            const auth = Buffer.from(`:${token}`).toString('base64');
-            headers['Authorization'] = `Basic ${auth}`;
-        }
-        const options = {
-            hostname: urlObj.hostname,
-            port: urlObj.port || 443,
-            path: urlObj.pathname + urlObj.search,
-            method,
-            headers,
-        };
-        // Ignore certificate errors if requested
-        if (ignoreCertErrors) {
-            options.rejectUnauthorized = false;
-        }
-        const req = https.request(options, (res) => {
-            let body = '';
-            res.on('data', (chunk) => {
-                body += chunk;
-            });
-            res.on('end', () => {
-                resolve({
-                    statusCode: res.statusCode || 0,
-                    headers: res.headers,
-                    body,
-                });
-            });
-        });
-        req.on('error', (error) => {
-            reject(error);
-        });
-        req.end();
-    });
+function getBooleanInput(name, defaultValue = false) {
+    const value = core.getInput(name);
+    if (value === '') {
+        return defaultValue;
+    }
+    return value.toLowerCase() === 'true';
 }
 /**
- * Get tag information from Bitbucket API
+ * Get optional string input
  */
-async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
-    // Bitbucket API endpoint for tag refs
-    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags/${tagName}`;
-    try {
-        const response = await httpRequest(url, token, 'GET', ignoreCertErrors);
-        if (response.statusCode === 404) {
-            return {
-                exists: false,
-                name: tagName,
-                item_sha: '',
-                item_type: types_1.ItemType.COMMIT,
-                commit_sha: '',
-                details: '',
-                verified: false,
-                is_draft: false,
-                is_prerelease: false,
-            };
-        }
-        if (response.statusCode !== 200) {
-            throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
-        }
-        const tagData = JSON.parse(response.body);
-        // Bitbucket returns tag information directly
-        const tagSha = tagData.target?.hash || '';
-        const commitSha = tagData.target?.hash || ''; // Bitbucket tags point directly to commits
-        const tagMessage = tagData.message || '';
-        const itemType = tagData.type === 'tag' ? types_1.ItemType.TAG : types_1.ItemType.COMMIT;
-        const verified = false; // Bitbucket doesn't provide GPG verification status via API
-        return {
-            exists: true,
-            name: tagName,
-            item_sha: tagSha,
-            item_type: itemType,
-            commit_sha: commitSha,
-            details: tagMessage,
-            verified,
-            is_draft: false,
-            is_prerelease: false,
-        };
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tag info from Bitbucket: ${error.message}`);
-        }
-        throw error;
-    }
+function getOptionalInput(name) {
+    const value = core.getInput(name);
+    return value === '' ? undefined : value;
 }
 /**
- * Get all tags from Bitbucket repository
+ * Get and validate action inputs
  */
-async function getAllTags(owner, repo, token, ignoreCertErrors = false) {
-    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags?pagelen=100`;
-    try {
-        const allTags = [];
-        let nextUrl = url;
-        while (nextUrl) {
-            const response = await httpRequest(nextUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
-            }
-            const data = JSON.parse(response.body);
-            const tags = data.values || [];
-            if (tags.length === 0) {
-                break;
-            }
-            // Extract tag names and dates
-            for (const tag of tags) {
-                const tagName = tag.name || '';
-                const date = tag.target?.date || tag.date || '';
-                allTags.push({ name: tagName, date });
-            }
-            // Check for next page
-            nextUrl = data.next || null;
+function getInputs() {
+    const tagName = core.getInput('tag_name', { required: true });
+    if (!tagName || tagName.trim() === '') {
+        throw new Error('tag_name is required and cannot be empty');
+    }
+    const tagTypeInput = core.getInput('tag_type') || 'tags';
+    if (tagTypeInput !== 'tags' && tagTypeInput !== 'release') {
+        throw new Error(`Invalid tag_type: ${tagTypeInput}. Must be 'tags' or 'release'`);
+    }
+    const tagType = tagTypeInput;
+    const repository = getOptionalInput('repository');
+    const platform = getOptionalInput('platform');
+    const owner = getOptionalInput('owner');
+    const repo = getOptionalInput('repo');
+    const baseUrl = getOptionalInput('base_url');
+    const token = getOptionalInput('token');
+    const ignoreCertErrors = getBooleanInput('ignore_cert_errors', false);
+    const tagFormatInput = getOptionalInput('tag_format');
+    const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
+    const verbose = getBooleanInput('verbose', false);
+    // Validate base URL format if provided
+    if (baseUrl) {
+        try {
+            new URL(baseUrl);
         }
-        return allTags;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tags from Bitbucket: ${error.message}`);
+        catch {
+            throw new Error(`Invalid base_url format: ${baseUrl}`);
         }
-        throw error;
     }
-}
-/**
- * Get release information from Bitbucket API
- * Note: Bitbucket doesn't have a dedicated releases API like GitHub/Gitea.
- * Releases in Bitbucket are typically just tags. We'll try to use the tags endpoint
- * and return release-like information if available.
- */
-async function getReleaseInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
-    // Bitbucket doesn't have a separate releases API, so we'll use tags
-    // and return them as releases. The tag info will be returned as release info.
-    const tagInfo = await getTagInfo(tagName, owner, repo, token, ignoreCertErrors);
-    if (!tagInfo.exists) {
-        return {
-            ...tagInfo,
-            item_type: types_1.ItemType.RELEASE,
-            is_draft: false,
-            is_prerelease: false,
-        };
-    }
-    // Bitbucket doesn't support draft/prerelease flags via API
     return {
-        ...tagInfo,
-        item_type: types_1.ItemType.RELEASE,
-        is_draft: false,
-        is_prerelease: false,
+        tagName: tagName.trim(),
+        tagType,
+        repository: repository?.trim(),
+        platform: platform?.trim(),
+        owner: owner?.trim(),
+        repo: repo?.trim(),
+        baseUrl: baseUrl?.trim(),
+        token: token?.trim() || undefined,
+        ignoreCertErrors,
+        tagFormat,
+        verbose,
     };
 }
 /**
- * Get all release names from Bitbucket repository
- * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names
+ * Resolve token from environment variables based on platform
+ * Falls back to platform-specific token environment variables if token is not provided
  */
-async function getAllReleaseNames(owner, repo, token, ignoreCertErrors = false) {
-    // Bitbucket doesn't have releases, so return tag names
-    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags?pagelen=100`;
-    try {
-        const allReleaseNames = [];
-        let nextUrl = url;
-        while (nextUrl) {
-            const response = await httpRequest(nextUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
-            }
-            const data = JSON.parse(response.body);
-            const tags = data.values || [];
-            if (tags.length === 0) {
-                break;
-            }
-            // Extract tag names
-            for (const tag of tags) {
-                if (tag.name) {
-                    allReleaseNames.push(tag.name);
-                }
-            }
-            // Check for next page
-            nextUrl = data.next || null;
-        }
-        return allReleaseNames;
+function resolveToken(token, platform) {
+    // If token is explicitly provided, use it
+    if (token) {
+        return token;
     }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get release names from Bitbucket: ${error.message}`);
-        }
-        throw error;
-    }
-}
-/**
- * Get all releases from Bitbucket repository with dates
- * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names with dates
- */
-async function getAllReleases(owner, repo, token, ignoreCertErrors = false) {
-    // Bitbucket doesn't have releases, so return tags with dates
-    const url = `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/refs/tags?pagelen=100`;
-    try {
-        const allReleases = [];
-        let nextUrl = url;
-        while (nextUrl) {
-            const response = await httpRequest(nextUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
-            }
-            const data = JSON.parse(response.body);
-            const tags = data.values || [];
-            if (tags.length === 0) {
-                break;
-            }
-            // Extract tag names and dates
-            for (const tag of tags) {
-                if (tag.name) {
-                    allReleases.push({
-                        name: tag.name,
-                        date: tag.target?.date || tag.date || '',
-                    });
-                }
-            }
-            // Check for next page
-            nextUrl = data.next || null;
-        }
-        return allReleases;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get releases from Bitbucket: ${error.message}`);
-        }
-        throw error;
+    // Otherwise, try platform-specific environment variables
+    switch (platform) {
+        case types_1.Platform.GITHUB:
+            return process.env.GITHUB_TOKEN;
+        case types_1.Platform.GITEA:
+            return process.env.GITEA_TOKEN || process.env.GITHUB_TOKEN; // Gitea Actions also provides GITHUB_TOKEN
+        case types_1.Platform.BITBUCKET:
+            return process.env.BITBUCKET_TOKEN;
+        case 'auto':
+        default:
+            // For auto or unknown, try common token environment variables
+            return (process.env.GITHUB_TOKEN ||
+                process.env.GITEA_TOKEN ||
+                process.env.BITBUCKET_TOKEN);
     }
 }
 
@@ -27874,754 +27724,6 @@ function getTagInfo(tagName, repoPath) {
 
 /***/ }),
 
-/***/ 4485:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getTagInfo = getTagInfo;
-exports.getAllTags = getAllTags;
-exports.getReleaseInfo = getReleaseInfo;
-exports.getAllReleaseNames = getAllReleaseNames;
-exports.getAllReleases = getAllReleases;
-const https = __importStar(__nccwpck_require__(5692));
-const http = __importStar(__nccwpck_require__(8611));
-const types_1 = __nccwpck_require__(8522);
-/**
- * Make HTTP request
- */
-function httpRequest(url, token, method = 'GET', ignoreCertErrors = false) {
-    return new Promise((resolve, reject) => {
-        const urlObj = new URL(url);
-        const isHttps = urlObj.protocol === 'https:';
-        const client = isHttps ? https : http;
-        const headers = {
-            'User-Agent': 'git-tag-info-action',
-            Accept: 'application/json',
-        };
-        if (token) {
-            headers['Authorization'] = `token ${token}`;
-        }
-        const options = {
-            hostname: urlObj.hostname,
-            port: urlObj.port || (isHttps ? 443 : 80),
-            path: urlObj.pathname + urlObj.search,
-            method,
-            headers,
-        };
-        // Ignore certificate errors if requested (HTTPS only)
-        if (isHttps && ignoreCertErrors) {
-            options.rejectUnauthorized = false;
-        }
-        const req = client.request(options, (res) => {
-            let body = '';
-            res.on('data', (chunk) => {
-                body += chunk;
-            });
-            res.on('end', () => {
-                resolve({
-                    statusCode: res.statusCode || 0,
-                    headers: res.headers,
-                    body,
-                });
-            });
-        });
-        req.on('error', (error) => {
-            reject(error);
-        });
-        req.end();
-    });
-}
-/**
- * Get tag information from Gitea API
- */
-async function getTagInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    // Gitea API endpoint for tag refs
-    const apiBase = baseUrl.replace(/\/$/, '');
-    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/git/refs/tags/${tagName}`;
-    try {
-        const response = await httpRequest(url, token, 'GET', ignoreCertErrors);
-        if (response.statusCode === 404) {
-            return {
-                exists: false,
-                name: tagName,
-                item_sha: '',
-                item_type: types_1.ItemType.COMMIT,
-                commit_sha: '',
-                details: '',
-                verified: false,
-                is_draft: false,
-                is_prerelease: false,
-            };
-        }
-        if (response.statusCode !== 200) {
-            throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-        }
-        const refData = JSON.parse(response.body);
-        // Get the object SHA (could be tag or commit)
-        const objectSha = refData.object?.sha || '';
-        const objectType = refData.object?.type || '';
-        // If it's a tag object, we need to fetch the tag object to get the commit
-        let commitSha = objectSha;
-        let tagMessage = '';
-        let itemType = types_1.ItemType.COMMIT;
-        let verified = false;
-        if (objectType === 'tag') {
-            // Fetch the tag object
-            const tagUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/git/tags/${objectSha}`;
-            const tagResponse = await httpRequest(tagUrl, token, 'GET', ignoreCertErrors);
-            if (tagResponse.statusCode === 200) {
-                const tagData = JSON.parse(tagResponse.body);
-                commitSha = tagData.object?.sha || objectSha;
-                tagMessage = tagData.message || '';
-                itemType = types_1.ItemType.TAG;
-                // Gitea doesn't provide verification status in the same way
-                verified = false;
-            }
-        }
-        return {
-            exists: true,
-            name: tagName,
-            item_sha: objectSha,
-            item_type: itemType,
-            commit_sha: commitSha,
-            details: tagMessage,
-            verified,
-            is_draft: false,
-            is_prerelease: false,
-        };
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tag info from Gitea: ${error.message}`);
-        }
-        throw error;
-    }
-}
-/**
- * Get all tags from Gitea repository
- */
-async function getAllTags(owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    const apiBase = baseUrl.replace(/\/$/, '');
-    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/tags?limit=100`;
-    try {
-        const allTags = [];
-        let page = 1;
-        let hasMore = true;
-        while (hasMore) {
-            const pageUrl = `${url}&page=${page}`;
-            const response = await httpRequest(pageUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-            }
-            const tags = JSON.parse(response.body);
-            if (!Array.isArray(tags) || tags.length === 0) {
-                hasMore = false;
-                break;
-            }
-            // Extract tag names and commit dates
-            for (const tag of tags) {
-                const tagName = tag.name || '';
-                const date = tag.commit?.created || tag.commit?.timestamp || '';
-                allTags.push({ name: tagName, date });
-            }
-            // Check if there are more pages
-            if (tags.length < 100) {
-                hasMore = false;
-            }
-            else {
-                page++;
-            }
-        }
-        return allTags;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tags from Gitea: ${error.message}`);
-        }
-        throw error;
-    }
-}
-/**
- * Get release information from Gitea API
- */
-async function getReleaseInfo(tagName, owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    const apiBase = baseUrl.replace(/\/$/, '');
-    try {
-        let releaseUrl;
-        if (tagName.toLowerCase() === 'latest') {
-            // Get latest release
-            releaseUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/releases/latest`;
-        }
-        else {
-            // Get release by tag
-            releaseUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/releases/tags/${tagName}`;
-        }
-        const response = await httpRequest(releaseUrl, token, 'GET', ignoreCertErrors);
-        if (response.statusCode === 404) {
-            return {
-                exists: false,
-                name: tagName,
-                item_sha: '',
-                item_type: types_1.ItemType.RELEASE,
-                commit_sha: '',
-                details: '',
-                verified: false,
-                is_draft: false,
-                is_prerelease: false,
-            };
-        }
-        if (response.statusCode !== 200) {
-            throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-        }
-        const releaseData = JSON.parse(response.body);
-        // Fetch the tag SHA for the release's tag
-        let itemSha = '';
-        let commitSha = '';
-        try {
-            const tagUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/git/refs/tags/${releaseData.tag_name}`;
-            const tagResponse = await httpRequest(tagUrl, token, 'GET', ignoreCertErrors);
-            if (tagResponse.statusCode === 200) {
-                const refData = JSON.parse(tagResponse.body);
-                itemSha = refData.object?.sha || '';
-                // Get commit SHA from tag object if it's an annotated tag
-                if (refData.object?.type === 'tag' && itemSha) {
-                    const tagObjUrl = `${apiBase}/api/v1/repos/${owner}/${repo}/git/tags/${itemSha}`;
-                    const tagObjResponse = await httpRequest(tagObjUrl, token, 'GET', ignoreCertErrors);
-                    if (tagObjResponse.statusCode === 200) {
-                        const tagObjData = JSON.parse(tagObjResponse.body);
-                        commitSha = tagObjData.object?.sha || itemSha;
-                    }
-                    else {
-                        commitSha = itemSha;
-                    }
-                }
-                else {
-                    commitSha = itemSha;
-                }
-            }
-        }
-        catch (error) {
-            // If we can't get the tag ref, leave SHAs empty
-        }
-        return {
-            exists: true,
-            name: releaseData.tag_name,
-            item_sha: itemSha,
-            item_type: types_1.ItemType.RELEASE,
-            commit_sha: commitSha,
-            details: releaseData.note || releaseData.body || '',
-            verified: false,
-            is_draft: releaseData.is_draft || false,
-            is_prerelease: releaseData.is_prerelease || false,
-        };
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get release info from Gitea: ${error.message}`);
-        }
-        throw error;
-    }
-}
-/**
- * Get all release names from Gitea repository
- */
-async function getAllReleaseNames(owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    const apiBase = baseUrl.replace(/\/$/, '');
-    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/releases?limit=100`;
-    try {
-        const allReleaseNames = [];
-        let page = 1;
-        let hasMore = true;
-        while (hasMore) {
-            const pageUrl = `${url}&page=${page}`;
-            const response = await httpRequest(pageUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-            }
-            const releases = JSON.parse(response.body);
-            if (!Array.isArray(releases) || releases.length === 0) {
-                hasMore = false;
-                break;
-            }
-            // Extract release tag names
-            for (const release of releases) {
-                if (release.tag_name) {
-                    allReleaseNames.push(release.tag_name);
-                }
-            }
-            // Check if there are more pages
-            if (releases.length < 100) {
-                hasMore = false;
-            }
-            else {
-                page++;
-            }
-        }
-        return allReleaseNames;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get release names from Gitea: ${error.message}`);
-        }
-        throw error;
-    }
-}
-/**
- * Get all releases from Gitea repository with dates
- */
-async function getAllReleases(owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    const apiBase = baseUrl.replace(/\/$/, '');
-    const url = `${apiBase}/api/v1/repos/${owner}/${repo}/releases?limit=100`;
-    try {
-        const allReleases = [];
-        let page = 1;
-        let hasMore = true;
-        while (hasMore) {
-            const pageUrl = `${url}&page=${page}`;
-            const response = await httpRequest(pageUrl, token, 'GET', ignoreCertErrors);
-            if (response.statusCode !== 200) {
-                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-            }
-            const releases = JSON.parse(response.body);
-            if (!Array.isArray(releases) || releases.length === 0) {
-                hasMore = false;
-                break;
-            }
-            // Extract release tag names and published dates
-            for (const release of releases) {
-                if (release.tag_name) {
-                    allReleases.push({
-                        name: release.tag_name,
-                        date: release.published_at || release.created_at || '',
-                    });
-                }
-            }
-            // Check if there are more pages
-            if (releases.length < 100) {
-                hasMore = false;
-            }
-            else {
-                page++;
-            }
-        }
-        return allReleases;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get releases from Gitea: ${error.message}`);
-        }
-        throw error;
-    }
-}
-
-
-/***/ }),
-
-/***/ 7890:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getTagInfo = getTagInfo;
-exports.getAllTagNames = getAllTagNames;
-exports.getAllTags = getAllTags;
-exports.getReleaseInfo = getReleaseInfo;
-exports.getAllReleaseNames = getAllReleaseNames;
-exports.getAllReleases = getAllReleases;
-const https = __importStar(__nccwpck_require__(5692));
-const rest_1 = __nccwpck_require__(9380);
-const plugin_throttling_1 = __nccwpck_require__(6856);
-const core = __importStar(__nccwpck_require__(7484));
-const types_1 = __nccwpck_require__(8522);
-// Create Octokit with throttling plugin for automatic rate limit handling
-const ThrottledOctokit = rest_1.Octokit.plugin(plugin_throttling_1.throttling);
-/**
- * Create an Octokit instance with optional authentication, certificate validation, and rate limit handling
- */
-function createOctokit(token, ignoreCertErrors = false) {
-    const options = {
-        auth: token,
-        throttle: {
-            onRateLimit: (retryAfter, options, octokit, retryCount) => {
-                core.warning(`Rate limit exceeded for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
-                // Retry up to 2 times
-                if (retryCount < 2) {
-                    return true;
-                }
-                return false;
-            },
-            onSecondaryRateLimit: (retryAfter, options, octokit) => {
-                core.warning(`Secondary rate limit detected for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
-                // Always retry secondary rate limits (abuse detection)
-                return true;
-            },
-        },
-    };
-    // Handle certificate validation for GitHub Enterprise with self-signed certs
-    if (ignoreCertErrors) {
-        const agent = new https.Agent({
-            rejectUnauthorized: false,
-        });
-        options.request = {
-            agent,
-        };
-    }
-    return new ThrottledOctokit(options);
-}
-/**
- * Get tag information from GitHub API
- */
-async function getTagInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        // Get the tag ref
-        const { data: refData } = await octokit.git.getRef({
-            owner,
-            repo,
-            ref: `tags/${tagName}`,
-        });
-        // Get the object SHA (could be tag or commit)
-        const objectSha = refData.object.sha;
-        const objectType = refData.object.type;
-        // If it's a tag object, we need to fetch the tag object to get the commit
-        let commitSha = objectSha;
-        let tagMessage = '';
-        let itemType = types_1.ItemType.COMMIT;
-        let verified = false;
-        if (objectType === 'tag') {
-            // Fetch the tag object
-            try {
-                const { data: tagData } = await octokit.git.getTag({
-                    owner,
-                    repo,
-                    tag_sha: objectSha,
-                });
-                commitSha = tagData.object.sha;
-                tagMessage = tagData.message || '';
-                itemType = types_1.ItemType.TAG;
-                verified = tagData.verification?.verified || false;
-            }
-            catch (error) {
-                // If we can't get the tag object, use the ref data
-                // This shouldn't happen, but handle gracefully
-            }
-        }
-        return {
-            exists: true,
-            name: tagName,
-            item_sha: objectSha,
-            item_type: itemType,
-            commit_sha: commitSha,
-            details: tagMessage,
-            verified,
-            is_draft: false,
-            is_prerelease: false,
-        };
-    }
-    catch (error) {
-        // Handle 404 errors (tag doesn't exist)
-        if (error.status === 404) {
-            return {
-                exists: false,
-                name: tagName,
-                item_sha: '',
-                item_type: types_1.ItemType.COMMIT,
-                commit_sha: '',
-                details: '',
-                verified: false,
-                is_draft: false,
-                is_prerelease: false,
-            };
-        }
-        // Re-throw other errors with formatted message
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tag info from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get tag info from GitHub: ${String(error)}`);
-    }
-}
-/**
- * Get all tag names from GitHub repository (fast, no dates)
- * This is optimized for cases where dates are not needed (e.g., semver sorting)
- * Uses the /repos/{owner}/{repo}/tags endpoint which returns tags in reverse
- * chronological order (newest first), so we can limit to the first page
- * to get the most recent tags.
- */
-async function getAllTagNames(owner, repo, token, ignoreCertErrors = false, maxTags = 100) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        const { data: tags } = await octokit.repos.listTags({
-            owner,
-            repo,
-            per_page: Math.min(maxTags, 100),
-        });
-        // Extract tag names (the 'name' field contains the tag name)
-        const tagNames = tags.map((tag) => tag.name).filter((name) => name);
-        return tagNames;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tag names from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get tag names from GitHub: ${String(error)}`);
-    }
-}
-/**
- * Get all tags from GitHub repository with dates
- * Note: This makes many API calls (1 per tag for commit dates). Consider using getAllTagNames() first
- * if dates are not needed (e.g., for semver sorting).
- * Uses the /repos/{owner}/{repo}/tags endpoint which returns tags sorted by date (newest first),
- * allowing us to limit to the most recent tags.
- */
-async function getAllTags(owner, repo, token, ignoreCertErrors = false, maxTags = 100) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        const { data: tags } = await octokit.repos.listTags({
-            owner,
-            repo,
-            per_page: Math.min(maxTags, 100),
-        });
-        const allTags = [];
-        // Extract tag names and fetch commit dates
-        for (const tag of tags) {
-            const tagName = tag.name || '';
-            let date = '';
-            // Get commit date from the tag's commit
-            // The /tags endpoint includes a commit object with SHA, but not the full commit details
-            // So we need to fetch the commit to get the date
-            try {
-                const commitSha = tag.commit?.sha || '';
-                if (commitSha) {
-                    const { data: commitData } = await octokit.git.getCommit({
-                        owner,
-                        repo,
-                        commit_sha: commitSha,
-                    });
-                    date = commitData.committer?.date || '';
-                }
-            }
-            catch {
-                // If we can't get the date, continue without it
-            }
-            allTags.push({ name: tagName, date });
-        }
-        return allTags;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get tags from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get tags from GitHub: ${String(error)}`);
-    }
-}
-/**
- * Get release information from GitHub API
- */
-async function getReleaseInfo(tagName, owner, repo, token, ignoreCertErrors = false) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        // Get release by tag name or latest if tagName is "latest"
-        let releaseData;
-        if (tagName.toLowerCase() === 'latest') {
-            const { data } = await octokit.repos.getLatestRelease({
-                owner,
-                repo,
-            });
-            releaseData = data;
-        }
-        else {
-            const { data } = await octokit.repos.getReleaseByTag({
-                owner,
-                repo,
-                tag: tagName,
-            });
-            releaseData = data;
-        }
-        // Fetch the tag SHA for the release's tag
-        let itemSha = '';
-        let commitSha = '';
-        try {
-            const { data: refData } = await octokit.git.getRef({
-                owner,
-                repo,
-                ref: `tags/${releaseData.tag_name}`,
-            });
-            itemSha = refData.object.sha;
-            // Get commit SHA from tag
-            if (refData.object.type === 'tag') {
-                try {
-                    const { data: tagData } = await octokit.git.getTag({
-                        owner,
-                        repo,
-                        tag_sha: itemSha,
-                    });
-                    commitSha = tagData.object.sha;
-                }
-                catch {
-                    commitSha = itemSha;
-                }
-            }
-            else {
-                commitSha = itemSha;
-            }
-        }
-        catch (error) {
-            // If we can't get the tag ref, leave SHAs empty
-        }
-        return {
-            exists: true,
-            name: releaseData.tag_name,
-            item_sha: itemSha,
-            item_type: types_1.ItemType.RELEASE,
-            commit_sha: commitSha,
-            details: releaseData.body || '',
-            verified: false,
-            is_draft: releaseData.draft || false,
-            is_prerelease: releaseData.prerelease || false,
-        };
-    }
-    catch (error) {
-        // Handle 404 errors (release doesn't exist)
-        if (error.status === 404) {
-            return {
-                exists: false,
-                name: tagName,
-                item_sha: '',
-                item_type: types_1.ItemType.RELEASE,
-                commit_sha: '',
-                details: '',
-                verified: false,
-                is_draft: false,
-                is_prerelease: false,
-            };
-        }
-        // Re-throw other errors with formatted message
-        if (error instanceof Error) {
-            throw new Error(`Failed to get release info from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get release info from GitHub: ${String(error)}`);
-    }
-}
-/**
- * Get all release names from GitHub repository
- */
-async function getAllReleaseNames(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        const { data: releases } = await octokit.repos.listReleases({
-            owner,
-            repo,
-            per_page: Math.min(maxReleases, 100),
-        });
-        // Extract release tag names
-        const releaseNames = releases.map((release) => release.tag_name).filter((name) => name);
-        return releaseNames;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get release names from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get release names from GitHub: ${String(error)}`);
-    }
-}
-/**
- * Get all releases from GitHub repository with dates
- */
-async function getAllReleases(owner, repo, token, ignoreCertErrors = false, maxReleases = 100) {
-    const octokit = createOctokit(token, ignoreCertErrors);
-    try {
-        const { data: releases } = await octokit.repos.listReleases({
-            owner,
-            repo,
-            per_page: Math.min(maxReleases, 100),
-        });
-        // Extract release tag names and published dates
-        const allReleases = releases.map((release) => ({
-            name: release.tag_name,
-            date: release.published_at || release.created_at || '',
-        }));
-        return allReleases;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to get releases from GitHub: ${error.message}`);
-        }
-        throw new Error(`Failed to get releases from GitHub: ${String(error)}`);
-    }
-}
-
-
-/***/ }),
-
 /***/ 9407:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -28662,120 +27764,55 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
-const repo_detector_1 = __nccwpck_require__(3730);
-const git_client_1 = __nccwpck_require__(7551);
-const github_client_1 = __nccwpck_require__(7890);
-const gitea_client_1 = __nccwpck_require__(4485);
-const bitbucket_client_1 = __nccwpck_require__(1420);
+const config_1 = __nccwpck_require__(2973);
+const repo_utils_1 = __nccwpck_require__(4595);
+const platform_factory_1 = __nccwpck_require__(1990);
 const tag_resolver_1 = __nccwpck_require__(7722);
-const types_1 = __nccwpck_require__(8522);
-const format_parser_1 = __nccwpck_require__(9594);
 const logger_1 = __nccwpck_require__(6999);
-/**
- * Get item information (tag or release) based on repository configuration
- */
-async function getItemInfoFromRepo(tagName, config, itemType) {
-    // Validate: releases are not supported for local repositories
-    if (itemType === 'release' && config.type === 'local') {
-        throw new Error('Releases are not supported for local repositories. Use tag_type: tags or query a remote repository.');
-    }
-    if (config.type === 'local') {
-        if (!config.path) {
-            throw new Error('Local repository path is required');
-        }
-        if (itemType === 'release') {
-            throw new Error('Releases are not supported for local repositories');
-        }
-        return (0, git_client_1.getTagInfo)(tagName, config.path);
-    }
-    if (config.type === 'remote') {
-        if (!config.platform || !config.owner || !config.repo) {
-            throw new Error('Remote repository configuration is incomplete');
-        }
-        if (itemType === 'release') {
-            // Route to release functions
-            switch (config.platform) {
-                case types_1.Platform.GITHUB:
-                    return await (0, github_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-                case types_1.Platform.GITEA:
-                    if (!config.baseUrl) {
-                        throw new Error('Gitea base URL is required');
-                    }
-                    return await (0, gitea_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-                case types_1.Platform.BITBUCKET:
-                    return await (0, bitbucket_client_1.getReleaseInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-                default:
-                    throw new Error(`Unsupported platform: ${config.platform}`);
-            }
-        }
-        else {
-            // Route to tag functions
-            switch (config.platform) {
-                case types_1.Platform.GITHUB:
-                    return await (0, github_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-                case types_1.Platform.GITEA:
-                    if (!config.baseUrl) {
-                        throw new Error('Gitea base URL is required');
-                    }
-                    return await (0, gitea_client_1.getTagInfo)(tagName, config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-                case types_1.Platform.BITBUCKET:
-                    return await (0, bitbucket_client_1.getTagInfo)(tagName, config.owner, config.repo, config.token, config.ignoreCertErrors);
-                default:
-                    throw new Error(`Unsupported platform: ${config.platform}`);
-            }
-        }
-    }
-    throw new Error('Invalid repository configuration');
-}
 /**
  * Main action entry point
  */
 async function run() {
     try {
-        // Read inputs
-        const tagName = core.getInput('tag_name', { required: true });
-        const tagType = core.getInput('tag_type') || 'tags'; // Default to 'tags'
-        const repository = core.getInput('repository');
-        const platform = core.getInput('platform');
-        const owner = core.getInput('owner');
-        const repo = core.getInput('repo');
-        const baseUrl = core.getInput('base_url');
-        // Fallback to GITHUB_TOKEN if custom token is not provided
-        const token = core.getInput('token') || process.env.GITHUB_TOKEN;
-        const ignoreCertErrors = core.getBooleanInput('ignore_cert_errors');
-        const tagFormatInput = core.getInput('tag_format') || undefined;
-        const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
-        const verbose = core.getBooleanInput('verbose');
-        const logger = new logger_1.Logger(verbose);
+        // Get and validate inputs
+        const inputs = (0, config_1.getInputs)();
+        const logger = new logger_1.Logger(inputs.verbose);
         const shortSha = (value) => (value ? value.substring(0, 7) : '');
-        // Validate tag_type input
-        if (tagType !== 'tags' && tagType !== 'release') {
-            throw new Error(`Invalid tag_type: ${tagType}. Must be 'tags' or 'release'`);
-        }
         // Warn if certificate errors are being ignored (security risk)
-        if (ignoreCertErrors) {
+        if (inputs.ignoreCertErrors) {
             logger.warning('SSL certificate validation is disabled. This is a security risk and should only be used with self-hosted instances with self-signed certificates.');
         }
         // Mask token in logs
-        if (token) {
-            core.setSecret(token);
+        if (inputs.token) {
+            core.setSecret(inputs.token);
         }
-        // Detect repository configuration
+        // Get repository information
         logger.info('Detecting repository configuration...');
-        const repoConfig = (0, repo_detector_1.detectRepository)(repository, platform, owner, repo, baseUrl, token, ignoreCertErrors);
-        logger.info(`Repository type: ${repoConfig.type}, Platform: ${repoConfig.platform || 'N/A'}, Item type: ${tagType}`);
+        const repoInfo = await (0, repo_utils_1.getRepositoryInfo)(inputs.repository, inputs.platform, inputs.owner, inputs.repo, logger);
+        // Resolve token based on detected platform
+        const resolvedToken = (0, config_1.resolveToken)(inputs.token, repoInfo.platform);
+        // Create platform API instance
+        const { platform, api: platformAPI } = await (0, platform_factory_1.createPlatformAPI)(repoInfo, inputs.platform ? inputs.platform.toLowerCase() : 'auto', {
+            token: resolvedToken,
+            baseUrl: inputs.baseUrl,
+            ignoreCertErrors: inputs.ignoreCertErrors,
+            verbose: inputs.verbose
+        }, logger);
+        logger.info(`Repository: ${repoInfo.owner || 'local'}/${repoInfo.repo || repoInfo.path || 'unknown'}, Platform: ${platform}, Item type: ${inputs.tagType}`);
         // Resolve "latest" tag/release if needed
-        let resolvedTagName = tagName;
-        if (tagName.toLowerCase() === 'latest') {
-            const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+        let resolvedTagName = inputs.tagName;
+        if (inputs.tagName.toLowerCase() === 'latest') {
+            const itemTypeLabel = inputs.tagType === 'release' ? 'release' : 'tag';
             logger.info(`Resolving latest ${itemTypeLabel}...`);
-            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(repoConfig, tagFormat, tagType);
+            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(platformAPI, inputs.tagFormat, inputs.tagType);
             logger.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
         }
         // Get item information (tag or release)
-        const itemTypeLabel = tagType === 'release' ? 'release' : 'tag';
+        const itemTypeLabel = inputs.tagType === 'release' ? 'release' : 'tag';
         logger.info(`Fetching ${itemTypeLabel} information for: ${resolvedTagName}`);
-        const itemInfo = await getItemInfoFromRepo(resolvedTagName, repoConfig, tagType);
+        const itemInfo = inputs.tagType === 'release'
+            ? await platformAPI.getReleaseInfo(resolvedTagName)
+            : await platformAPI.getTagInfo(resolvedTagName);
         // Set outputs with normalized field names
         core.setOutput('exists', itemInfo.exists.toString());
         core.setOutput('name', itemInfo.name);
@@ -28800,11 +27837,11 @@ async function run() {
             if (itemInfo.details) {
                 logger.debug(`Details: ${itemInfo.details.substring(0, 100)}...`);
             }
-            if (tagType === 'release') {
+            if (inputs.tagType === 'release') {
                 logger.debug(`Draft: ${itemInfo.is_draft}`);
                 logger.debug(`Prerelease: ${itemInfo.is_prerelease}`);
             }
-            if (tagType === 'tags' && itemInfo.verified) {
+            if (inputs.tagType === 'tags' && itemInfo.verified) {
                 logger.debug(`Verified: ${itemInfo.verified}`);
             }
         }
@@ -28901,7 +27938,7 @@ exports.Logger = Logger;
 
 /***/ }),
 
-/***/ 3730:
+/***/ 1737:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -28940,206 +27977,1963 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.detectRepository = detectRepository;
-const path = __importStar(__nccwpck_require__(6928));
+exports.BitbucketAPI = void 0;
+exports.detectFromUrlByHostname = detectFromUrlByHostname;
+exports.detectFromUrl = detectFromUrl;
+exports.determineBaseUrl = determineBaseUrl;
+const https = __importStar(__nccwpck_require__(5692));
 const types_1 = __nccwpck_require__(8522);
 /**
- * Detect if a string is a URL (remote repository) or a path (local repository)
+ * Make HTTP request for Bitbucket (uses Basic Auth)
  */
-function isUrl(repository) {
-    return (repository.startsWith('http://') ||
-        repository.startsWith('https://') ||
-        repository.startsWith('git@'));
+async function httpRequest(url, token, ignoreCertErrors, logger) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const headers = {
+            'User-Agent': 'git-action-tag-info',
+            Accept: 'application/json',
+        };
+        if (token) {
+            // Bitbucket uses Basic Auth with app password or token
+            const auth = Buffer.from(`:${token}`).toString('base64');
+            headers['Authorization'] = `Basic ${auth}`;
+        }
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || 443,
+            path: urlObj.pathname + urlObj.search,
+            method: 'GET',
+            headers,
+        };
+        // Ignore certificate errors if requested
+        if (ignoreCertErrors) {
+            options.rejectUnauthorized = false;
+        }
+        // Log request if verbose
+        if (logger.verbose) {
+            const sanitizedHeaders = { ...headers };
+            if (sanitizedHeaders.Authorization) {
+                sanitizedHeaders.Authorization = '***';
+            }
+            logger.debug(`HTTP GET ${url}`);
+            logger.debug(`Headers: ${JSON.stringify(sanitizedHeaders, null, 2)}`);
+        }
+        const req = https.request(options, (res) => {
+            let body = '';
+            res.on('data', (chunk) => {
+                body += chunk;
+            });
+            res.on('end', () => {
+                const response = {
+                    statusCode: res.statusCode || 0,
+                    headers: res.headers,
+                    body,
+                };
+                // Log response if verbose
+                if (logger.verbose) {
+                    logger.debug(`HTTP Response: ${response.statusCode} ${res.statusMessage || ''}`);
+                    try {
+                        const parsedBody = JSON.parse(body);
+                        logger.debug(`Response body: ${JSON.stringify(parsedBody, null, 2)}`);
+                    }
+                    catch {
+                        logger.debug(`Response body: ${body.substring(0, 200)}...`);
+                    }
+                }
+                resolve(response);
+            });
+        });
+        req.on('error', (error) => {
+            if (logger.verbose) {
+                logger.debug(`Request error: ${error.message}`);
+            }
+            reject(error);
+        });
+        req.end();
+    });
 }
 /**
- * Parse GitHub URL
+ * Bitbucket API client
  */
-function parseGitHubUrl(url) {
-    // https://github.com/owner/repo
-    // https://github.com/owner/repo.git
-    // git@github.com:owner/repo.git
-    const patterns = [
-        /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+?)(?:\.git)?(?:\/.*)?$/,
-        /^git@github\.com:([^\/]+)\/([^\/]+?)(?:\.git)?$/,
-    ];
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) {
+class BitbucketAPI {
+    repoInfo;
+    config;
+    logger;
+    baseUrl;
+    constructor(repoInfo, config, logger) {
+        this.repoInfo = repoInfo;
+        this.config = config;
+        this.logger = logger;
+        this.baseUrl = config.baseUrl || 'https://api.bitbucket.org/2.0';
+    }
+    /**
+     * Get tag information
+     */
+    async getTagInfo(tagName) {
+        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags/${tagName}`;
+        try {
+            const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
+            if (response.statusCode === 404) {
+                return {
+                    exists: false,
+                    name: tagName,
+                    item_sha: '',
+                    item_type: types_1.ItemType.COMMIT,
+                    commit_sha: '',
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            if (response.statusCode !== 200) {
+                throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
+            }
+            const tagData = JSON.parse(response.body);
+            // Bitbucket returns tag information directly
+            const tagSha = tagData.target?.hash || '';
+            const commitSha = tagData.target?.hash || ''; // Bitbucket tags point directly to commits
+            const tagMessage = tagData.message || '';
+            const itemType = tagData.type === 'tag' ? types_1.ItemType.TAG : types_1.ItemType.COMMIT;
+            const verified = false; // Bitbucket doesn't provide GPG verification status via API
             return {
-                owner: match[1],
-                repo: match[2].replace(/\.git$/, ''),
+                exists: true,
+                name: tagName,
+                item_sha: tagSha,
+                item_type: itemType,
+                commit_sha: commitSha,
+                details: tagMessage,
+                verified,
+                is_draft: false,
+                is_prerelease: false,
             };
         }
-    }
-    return null;
-}
-/**
- * Parse Gitea URL
- */
-function parseGiteaUrl(url, baseUrl) {
-    // https://gitea.example.com/owner/repo
-    // https://gitea.example.com/owner/repo.git
-    // git@gitea.example.com:owner/repo.git
-    let urlToParse = url;
-    // Extract base URL from the repository URL if not provided
-    if (!baseUrl) {
-        const httpsMatch = url.match(/^(https?:\/\/[^\/]+)/);
-        const sshMatch = url.match(/^git@([^:]+)/);
-        if (httpsMatch) {
-            baseUrl = httpsMatch[1];
-        }
-        else if (sshMatch) {
-            baseUrl = `https://${sshMatch[1]}`;
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag info from Bitbucket: ${error.message}`);
+            }
+            throw error;
         }
     }
-    if (!baseUrl) {
-        return null;
-    }
-    // Remove base URL to get path
-    urlToParse = url.replace(/^https?:\/\//, '').replace(/^git@/, '');
-    const baseUrlWithoutProtocol = baseUrl.replace(/^https?:\/\//, '');
-    urlToParse = urlToParse.replace(baseUrlWithoutProtocol, '').replace(/^:/, '').replace(/^\//, '');
-    // Extract owner/repo from path
-    const pathMatch = urlToParse.match(/^([^\/]+)\/([^\/]+?)(?:\.git)?(?:\/.*)?$/);
-    if (pathMatch) {
+    /**
+     * Get release information
+     * Note: Bitbucket doesn't have a dedicated releases API like GitHub/Gitea.
+     * Releases in Bitbucket are typically just tags. We'll use the tags endpoint
+     * and return release-like information.
+     */
+    async getReleaseInfo(tagName) {
+        // Bitbucket doesn't have a separate releases API, so we'll use tags
+        // and return them as releases. The tag info will be returned as release info.
+        const tagInfo = await this.getTagInfo(tagName);
+        if (!tagInfo.exists) {
+            return {
+                ...tagInfo,
+                item_type: types_1.ItemType.RELEASE,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        // Bitbucket doesn't support draft/prerelease flags via API
         return {
-            owner: pathMatch[1],
-            repo: pathMatch[2].replace(/\.git$/, ''),
-            baseUrl,
+            ...tagInfo,
+            item_type: types_1.ItemType.RELEASE,
+            is_draft: false,
+            is_prerelease: false,
         };
     }
-    return null;
-}
-/**
- * Parse Bitbucket URL
- */
-function parseBitbucketUrl(url) {
-    // https://bitbucket.org/owner/repo
-    // https://bitbucket.org/owner/repo.git
-    // git@bitbucket.org:owner/repo.git
-    const patterns = [
-        /^https?:\/\/bitbucket\.org\/([^\/]+)\/([^\/]+?)(?:\.git)?(?:\/.*)?$/,
-        /^git@bitbucket\.org:([^\/]+)\/([^\/]+?)(?:\.git)?$/,
-    ];
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) {
-            return {
-                owner: match[1],
-                repo: match[2].replace(/\.git$/, ''),
-            };
+    /**
+     * Get all tag names (optimized, no dates)
+     */
+    async getAllTagNames() {
+        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        try {
+            const allTagNames = [];
+            let nextUrl = url;
+            while (nextUrl) {
+                const response = await httpRequest(nextUrl, this.config.token, this.config.ignoreCertErrors, this.logger);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
+                }
+                const data = JSON.parse(response.body);
+                const tags = data.values || [];
+                if (tags.length === 0) {
+                    break;
+                }
+                // Extract tag names
+                for (const tag of tags) {
+                    if (tag.name) {
+                        allTagNames.push(tag.name);
+                    }
+                }
+                // Check for next page
+                nextUrl = data.next || null;
+            }
+            return allTagNames;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag names from Bitbucket: ${error.message}`);
+            }
+            throw error;
         }
     }
-    return null;
-}
-/**
- * Detect platform from URL
- */
-function detectPlatformFromUrl(url) {
-    if (url.includes('github.com')) {
-        return types_1.Platform.GITHUB;
+    /**
+     * Get all tags with dates
+     */
+    async getAllTags() {
+        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        try {
+            const allTags = [];
+            let nextUrl = url;
+            while (nextUrl) {
+                const response = await httpRequest(nextUrl, this.config.token, this.config.ignoreCertErrors, this.logger);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Bitbucket API error: ${response.statusCode} - ${response.body}`);
+                }
+                const data = JSON.parse(response.body);
+                const tags = data.values || [];
+                if (tags.length === 0) {
+                    break;
+                }
+                // Extract tag names and dates
+                for (const tag of tags) {
+                    const tagName = tag.name || '';
+                    const date = tag.target?.date || tag.date || '';
+                    allTags.push({ name: tagName, date });
+                }
+                // Check for next page
+                nextUrl = data.next || null;
+            }
+            return allTags;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tags from Bitbucket: ${error.message}`);
+            }
+            throw error;
+        }
     }
-    if (url.includes('bitbucket.org')) {
+    /**
+     * Get all release names (optimized, no dates)
+     * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names
+     */
+    async getAllReleaseNames() {
+        // Bitbucket doesn't have releases, so return tag names
+        return this.getAllTagNames();
+    }
+    /**
+     * Get all releases with dates
+     * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names with dates
+     */
+    async getAllReleases() {
+        // Bitbucket doesn't have releases, so return tags with dates
+        return this.getAllTags();
+    }
+}
+exports.BitbucketAPI = BitbucketAPI;
+/**
+ * Detect Bitbucket from URL hostname
+ */
+function detectFromUrlByHostname(url) {
+    const hostname = url.hostname.toLowerCase();
+    if (hostname.includes('bitbucket.org') || hostname.includes('bitbucket')) {
         return types_1.Platform.BITBUCKET;
     }
-    // Gitea is detected by exclusion or explicit base_url
-    return types_1.Platform.GITEA;
+    return undefined;
 }
 /**
- * Build repository configuration from inputs
+ * Detect Bitbucket from URL by probing API endpoints
  */
-function detectRepository(repository, platform, owner, repo, baseUrl, token, ignoreCertErrors = false) {
-    // Apply fallback to GITHUB_TOKEN if token is not provided
-    const finalToken = token || process.env.GITHUB_TOKEN;
+async function headOk(url, logger) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    try {
+        const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (response.ok || response.status === 401 || response.status === 403) {
+            logger.debug(`Bitbucket detect: ${url} status ${response.status}`);
+            return true;
+        }
+    }
+    catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            logger.debug(`Bitbucket detect timeout: ${url}`);
+        }
+    }
+    return false;
+}
+async function detectFromUrl(url, logger) {
+    const base = `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}`;
+    const paths = ['/2.0/repositories'];
+    for (const path of paths) {
+        if (await headOk(`${base}${path}`, logger)) {
+            return types_1.Platform.BITBUCKET;
+        }
+    }
+    return undefined;
+}
+/**
+ * Determine base URL for Bitbucket API
+ */
+function determineBaseUrl(urls) {
+    const urlArray = Array.isArray(urls) ? urls : [urls];
+    // Check if first URL is an explicit API URL (contains /2.0 or /api)
+    if (urlArray.length > 0 && urlArray[0]) {
+        try {
+            const url = new URL(urlArray[0]);
+            if (url.pathname.includes('/2.0') || url.pathname.includes('/api')) {
+                return urlArray[0];
+            }
+        }
+        catch {
+            // Not a valid URL, continue
+        }
+    }
+    // Check repository/origin URLs to derive API URL
+    for (const urlStr of urlArray) {
+        if (!urlStr)
+            continue;
+        try {
+            const url = new URL(urlStr);
+            // Bitbucket API is at /2.0
+            const baseUrl = `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}/2.0`;
+            return baseUrl;
+        }
+        catch {
+            // Not a valid URL, skip
+        }
+    }
+    // Default Bitbucket API URL
+    return 'https://api.bitbucket.org/2.0';
+}
+
+
+/***/ }),
+
+/***/ 4862:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.GiteaAPI = void 0;
+exports.detectFromUrlByHostname = detectFromUrlByHostname;
+exports.detectFromUrl = detectFromUrl;
+exports.determineBaseUrl = determineBaseUrl;
+const types_1 = __nccwpck_require__(8522);
+const http_client_1 = __nccwpck_require__(3696);
+/**
+ * Gitea API client
+ */
+class GiteaAPI {
+    client;
+    repoInfo;
+    logger;
+    apiBase;
+    constructor(repoInfo, config, logger) {
+        if (!config.baseUrl) {
+            throw new Error('Gitea base URL is required');
+        }
+        this.apiBase = config.baseUrl.replace(/\/$/, '');
+        // Ensure baseUrl ends with /api/v1 for Gitea
+        if (!this.apiBase.endsWith('/api/v1')) {
+            this.apiBase = `${this.apiBase}/api/v1`;
+        }
+        this.client = new http_client_1.HttpClient({
+            baseUrl: this.apiBase,
+            token: config.token,
+            ignoreCertErrors: config.ignoreCertErrors,
+            verbose: config.verbose
+        }, logger);
+        this.repoInfo = repoInfo;
+        this.logger = logger;
+    }
+    /**
+     * Get tag information
+     */
+    async getTagInfo(tagName) {
+        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${tagName}`;
+        try {
+            const response = await this.client.get(url);
+            if (response.statusCode === 404) {
+                return {
+                    exists: false,
+                    name: tagName,
+                    item_sha: '',
+                    item_type: types_1.ItemType.COMMIT,
+                    commit_sha: '',
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            if (response.statusCode !== 200) {
+                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+            }
+            const refData = JSON.parse(response.body);
+            // Get the object SHA (could be tag or commit)
+            const objectSha = refData.object?.sha || '';
+            const objectType = refData.object?.type || '';
+            // If it's a tag object, we need to fetch the tag object to get the commit
+            let commitSha = objectSha;
+            let tagMessage = '';
+            let itemType = types_1.ItemType.COMMIT;
+            let verified = false;
+            if (objectType === 'tag') {
+                // Fetch the tag object
+                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${objectSha}`;
+                const tagResponse = await this.client.get(tagUrl);
+                if (tagResponse.statusCode === 200) {
+                    const tagData = JSON.parse(tagResponse.body);
+                    commitSha = tagData.object?.sha || objectSha;
+                    tagMessage = tagData.message || '';
+                    itemType = types_1.ItemType.TAG;
+                    // Gitea doesn't provide verification status in the same way
+                    verified = false;
+                }
+            }
+            return {
+                exists: true,
+                name: tagName,
+                item_sha: objectSha,
+                item_type: itemType,
+                commit_sha: commitSha,
+                details: tagMessage,
+                verified,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag info from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    /**
+     * Get release information
+     */
+    async getReleaseInfo(tagName) {
+        try {
+            let releaseUrl;
+            if (tagName.toLowerCase() === 'latest') {
+                // Get latest release
+                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/latest`;
+            }
+            else {
+                // Get release by tag
+                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/tags/${tagName}`;
+            }
+            const response = await this.client.get(releaseUrl);
+            if (response.statusCode === 404) {
+                return {
+                    exists: false,
+                    name: tagName,
+                    item_sha: '',
+                    item_type: types_1.ItemType.RELEASE,
+                    commit_sha: '',
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            if (response.statusCode !== 200) {
+                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+            }
+            const releaseData = JSON.parse(response.body);
+            // Fetch the tag SHA for the release's tag
+            let itemSha = '';
+            let commitSha = '';
+            try {
+                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${releaseData.tag_name}`;
+                const tagResponse = await this.client.get(tagUrl);
+                if (tagResponse.statusCode === 200) {
+                    const refData = JSON.parse(tagResponse.body);
+                    itemSha = refData.object?.sha || '';
+                    // Get commit SHA from tag object if it's an annotated tag
+                    if (refData.object?.type === 'tag' && itemSha) {
+                        const tagObjUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${itemSha}`;
+                        const tagObjResponse = await this.client.get(tagObjUrl);
+                        if (tagObjResponse.statusCode === 200) {
+                            const tagObjData = JSON.parse(tagObjResponse.body);
+                            commitSha = tagObjData.object?.sha || itemSha;
+                        }
+                        else {
+                            commitSha = itemSha;
+                        }
+                    }
+                    else {
+                        commitSha = itemSha;
+                    }
+                }
+            }
+            catch (error) {
+                // If we can't get the tag ref, leave SHAs empty
+            }
+            return {
+                exists: true,
+                name: releaseData.tag_name,
+                item_sha: itemSha,
+                item_type: types_1.ItemType.RELEASE,
+                commit_sha: commitSha,
+                details: releaseData.note || releaseData.body || '',
+                verified: false,
+                is_draft: releaseData.is_draft || false,
+                is_prerelease: releaseData.is_prerelease || false,
+            };
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get release info from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    /**
+     * Get all tag names (optimized, no dates)
+     */
+    async getAllTagNames() {
+        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        try {
+            const allTagNames = [];
+            let page = 1;
+            let hasMore = true;
+            while (hasMore) {
+                const pageUrl = `${url}&page=${page}`;
+                const response = await this.client.get(pageUrl);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+                }
+                const tags = JSON.parse(response.body);
+                if (!Array.isArray(tags) || tags.length === 0) {
+                    hasMore = false;
+                    break;
+                }
+                // Extract tag names
+                for (const tag of tags) {
+                    if (tag.name) {
+                        allTagNames.push(tag.name);
+                    }
+                }
+                // Check if there are more pages
+                if (tags.length < 100) {
+                    hasMore = false;
+                }
+                else {
+                    page++;
+                }
+            }
+            return allTagNames;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag names from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    /**
+     * Get all tags with dates
+     */
+    async getAllTags() {
+        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        try {
+            const allTags = [];
+            let page = 1;
+            let hasMore = true;
+            while (hasMore) {
+                const pageUrl = `${url}&page=${page}`;
+                const response = await this.client.get(pageUrl);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+                }
+                const tags = JSON.parse(response.body);
+                if (!Array.isArray(tags) || tags.length === 0) {
+                    hasMore = false;
+                    break;
+                }
+                // Extract tag names and commit dates
+                for (const tag of tags) {
+                    const tagName = tag.name || '';
+                    const date = tag.commit?.created || tag.commit?.timestamp || '';
+                    allTags.push({ name: tagName, date });
+                }
+                // Check if there are more pages
+                if (tags.length < 100) {
+                    hasMore = false;
+                }
+                else {
+                    page++;
+                }
+            }
+            return allTags;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tags from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    /**
+     * Get all release names (optimized, no dates)
+     */
+    async getAllReleaseNames() {
+        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        try {
+            const allReleaseNames = [];
+            let page = 1;
+            let hasMore = true;
+            while (hasMore) {
+                const pageUrl = `${url}&page=${page}`;
+                const response = await this.client.get(pageUrl);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+                }
+                const releases = JSON.parse(response.body);
+                if (!Array.isArray(releases) || releases.length === 0) {
+                    hasMore = false;
+                    break;
+                }
+                // Extract release tag names
+                for (const release of releases) {
+                    if (release.tag_name) {
+                        allReleaseNames.push(release.tag_name);
+                    }
+                }
+                // Check if there are more pages
+                if (releases.length < 100) {
+                    hasMore = false;
+                }
+                else {
+                    page++;
+                }
+            }
+            return allReleaseNames;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get release names from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+    /**
+     * Get all releases with dates
+     */
+    async getAllReleases() {
+        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        try {
+            const allReleases = [];
+            let page = 1;
+            let hasMore = true;
+            while (hasMore) {
+                const pageUrl = `${url}&page=${page}`;
+                const response = await this.client.get(pageUrl);
+                if (response.statusCode !== 200) {
+                    throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+                }
+                const releases = JSON.parse(response.body);
+                if (!Array.isArray(releases) || releases.length === 0) {
+                    hasMore = false;
+                    break;
+                }
+                // Extract release tag names and published dates
+                for (const release of releases) {
+                    if (release.tag_name) {
+                        allReleases.push({
+                            name: release.tag_name,
+                            date: release.published_at || release.created_at || '',
+                        });
+                    }
+                }
+                // Check if there are more pages
+                if (releases.length < 100) {
+                    hasMore = false;
+                }
+                else {
+                    page++;
+                }
+            }
+            return allReleases;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get releases from Gitea: ${error.message}`);
+            }
+            throw error;
+        }
+    }
+}
+exports.GiteaAPI = GiteaAPI;
+/**
+ * Detect Gitea from URL hostname
+ */
+function detectFromUrlByHostname(url) {
+    const hostname = url.hostname.toLowerCase();
+    if (hostname.includes('gitea.com') || hostname.includes('gitea')) {
+        return types_1.Platform.GITEA;
+    }
+    return undefined;
+}
+/**
+ * Detect Gitea from URL by probing API endpoints
+ */
+async function headOk(url, logger) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    try {
+        const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (response.ok || response.status === 401 || response.status === 403) {
+            logger.debug(`Gitea detect: ${url} status ${response.status}`);
+            return true;
+        }
+    }
+    catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            logger.debug(`Gitea detect timeout: ${url}`);
+        }
+    }
+    return false;
+}
+async function detectFromUrl(url, logger) {
+    const base = `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}`;
+    const paths = ['/api/v1/version'];
+    for (const path of paths) {
+        if (await headOk(`${base}${path}`, logger)) {
+            return types_1.Platform.GITEA;
+        }
+    }
+    return undefined;
+}
+/**
+ * Determine base URL for Gitea API
+ */
+function determineBaseUrl(urls) {
+    const urlArray = Array.isArray(urls) ? urls : [urls];
+    // Check if first URL is an explicit API URL (contains /api)
+    if (urlArray.length > 0 && urlArray[0]) {
+        try {
+            const url = new URL(urlArray[0]);
+            if (url.pathname.includes('/api')) {
+                return urlArray[0];
+            }
+        }
+        catch {
+            // Not a valid URL, continue
+        }
+    }
+    // Check repository/origin URLs to derive API URL
+    for (const urlStr of urlArray) {
+        if (!urlStr)
+            continue;
+        try {
+            const url = new URL(urlStr);
+            const baseUrl = `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}/api/v1`;
+            return baseUrl;
+        }
+        catch {
+            // Not a valid URL, skip
+        }
+    }
+    // Check environment variables
+    const serverUrl = process.env.GITHUB_SERVER_URL || process.env.GITEA_SERVER_URL || process.env.GITEA_API_URL;
+    if (serverUrl) {
+        return `${serverUrl.replace(/\/$/, '')}/api/v1`;
+    }
+    // Default Gitea API URL
+    return 'https://gitea.com/api/v1';
+}
+
+
+/***/ }),
+
+/***/ 6473:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.GitHubAPI = void 0;
+exports.detectFromUrlByHostname = detectFromUrlByHostname;
+exports.detectFromUrl = detectFromUrl;
+exports.determineBaseUrl = determineBaseUrl;
+const https = __importStar(__nccwpck_require__(5692));
+const rest_1 = __nccwpck_require__(9380);
+const plugin_throttling_1 = __nccwpck_require__(6856);
+const core = __importStar(__nccwpck_require__(7484));
+const types_1 = __nccwpck_require__(8522);
+// Create Octokit with throttling plugin for automatic rate limit handling
+const ThrottledOctokit = rest_1.Octokit.plugin(plugin_throttling_1.throttling);
+/**
+ * Create an Octokit instance with optional authentication, certificate validation, and rate limit handling
+ */
+function createOctokit(baseUrl, token, ignoreCertErrors = false) {
+    const options = {
+        auth: token,
+        baseUrl: baseUrl || 'https://api.github.com',
+        throttle: {
+            onRateLimit: (retryAfter, options, octokit, retryCount) => {
+                core.warning(`Rate limit exceeded for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
+                // Retry up to 2 times
+                if (retryCount < 2) {
+                    return true;
+                }
+                return false;
+            },
+            onSecondaryRateLimit: (retryAfter, options, _octokit) => {
+                core.warning(`Secondary rate limit detected for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
+                // Always retry secondary rate limits (abuse detection)
+                return true;
+            },
+        },
+    };
+    // Handle certificate validation for GitHub Enterprise with self-signed certs
+    if (ignoreCertErrors) {
+        const agent = new https.Agent({
+            rejectUnauthorized: false,
+        });
+        options.request = {
+            agent,
+        };
+    }
+    return new ThrottledOctokit(options);
+}
+/**
+ * GitHub API client
+ */
+class GitHubAPI {
+    octokit;
+    repoInfo;
+    logger;
+    constructor(repoInfo, config, logger) {
+        const baseUrl = config.baseUrl || 'https://api.github.com';
+        this.octokit = createOctokit(baseUrl, config.token, config.ignoreCertErrors);
+        this.repoInfo = repoInfo;
+        this.logger = logger;
+    }
+    /**
+     * Get tag information
+     */
+    async getTagInfo(tagName) {
+        try {
+            // Get the tag ref
+            const { data: refData } = await this.octokit.git.getRef({
+                owner: this.repoInfo.owner,
+                repo: this.repoInfo.repo,
+                ref: `tags/${tagName}`,
+            });
+            // Get the object SHA (could be tag or commit)
+            const objectSha = refData.object.sha;
+            const objectType = refData.object.type;
+            // If it's a tag object, we need to fetch the tag object to get the commit
+            let commitSha = objectSha;
+            let tagMessage = '';
+            let itemType = types_1.ItemType.COMMIT;
+            let verified = false;
+            if (objectType === 'tag') {
+                // Fetch the tag object
+                try {
+                    const { data: tagData } = await this.octokit.git.getTag({
+                        owner: this.repoInfo.owner,
+                        repo: this.repoInfo.repo,
+                        tag_sha: objectSha,
+                    });
+                    commitSha = tagData.object.sha;
+                    tagMessage = tagData.message || '';
+                    itemType = types_1.ItemType.TAG;
+                    verified = tagData.verification?.verified || false;
+                }
+                catch (error) {
+                    // If we can't get the tag object, use the ref data
+                    // This shouldn't happen, but handle gracefully
+                }
+            }
+            return {
+                exists: true,
+                name: tagName,
+                item_sha: objectSha,
+                item_type: itemType,
+                commit_sha: commitSha,
+                details: tagMessage,
+                verified,
+                is_draft: false,
+                is_prerelease: false,
+            };
+        }
+        catch (error) {
+            // Handle 404 errors (tag doesn't exist)
+            if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+                return {
+                    exists: false,
+                    name: tagName,
+                    item_sha: '',
+                    item_type: types_1.ItemType.COMMIT,
+                    commit_sha: '',
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            // Re-throw other errors with formatted message
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag info from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get tag info from GitHub: ${String(error)}`);
+        }
+    }
+    /**
+     * Get release information
+     */
+    async getReleaseInfo(tagName) {
+        try {
+            // Get release by tag name or latest if tagName is "latest"
+            let releaseData;
+            if (tagName.toLowerCase() === 'latest') {
+                const { data } = await this.octokit.repos.getLatestRelease({
+                    owner: this.repoInfo.owner,
+                    repo: this.repoInfo.repo,
+                });
+                releaseData = data;
+            }
+            else {
+                const { data } = await this.octokit.repos.getReleaseByTag({
+                    owner: this.repoInfo.owner,
+                    repo: this.repoInfo.repo,
+                    tag: tagName,
+                });
+                releaseData = data;
+            }
+            // Fetch the tag SHA for the release's tag
+            let itemSha = '';
+            let commitSha = '';
+            try {
+                const { data: refData } = await this.octokit.git.getRef({
+                    owner: this.repoInfo.owner,
+                    repo: this.repoInfo.repo,
+                    ref: `tags/${releaseData.tag_name}`,
+                });
+                itemSha = refData.object.sha;
+                // Get commit SHA from tag
+                if (refData.object.type === 'tag') {
+                    try {
+                        const { data: tagData } = await this.octokit.git.getTag({
+                            owner: this.repoInfo.owner,
+                            repo: this.repoInfo.repo,
+                            tag_sha: itemSha,
+                        });
+                        commitSha = tagData.object.sha;
+                    }
+                    catch {
+                        commitSha = itemSha;
+                    }
+                }
+                else {
+                    commitSha = itemSha;
+                }
+            }
+            catch (error) {
+                // If we can't get the tag ref, leave SHAs empty
+            }
+            return {
+                exists: true,
+                name: releaseData.tag_name,
+                item_sha: itemSha,
+                item_type: types_1.ItemType.RELEASE,
+                commit_sha: commitSha,
+                details: releaseData.body || '',
+                verified: false,
+                is_draft: releaseData.draft || false,
+                is_prerelease: releaseData.prerelease || false,
+            };
+        }
+        catch (error) {
+            // Handle 404 errors (release doesn't exist)
+            if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+                return {
+                    exists: false,
+                    name: tagName,
+                    item_sha: '',
+                    item_type: types_1.ItemType.RELEASE,
+                    commit_sha: '',
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            // Re-throw other errors with formatted message
+            if (error instanceof Error) {
+                throw new Error(`Failed to get release info from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get release info from GitHub: ${String(error)}`);
+        }
+    }
+    /**
+     * Get all tag names (optimized, no dates)
+     */
+    async getAllTagNames() {
+        try {
+            const { data: tags } = await this.octokit.repos.listTags({
+                owner: this.repoInfo.owner,
+                repo: this.repoInfo.repo,
+                per_page: 100,
+            });
+            // Extract tag names (the 'name' field contains the tag name)
+            const tagNames = tags.map((tag) => tag.name).filter((name) => name);
+            return tagNames;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tag names from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get tag names from GitHub: ${String(error)}`);
+        }
+    }
+    /**
+     * Get all tags with dates
+     */
+    async getAllTags() {
+        try {
+            const { data: tags } = await this.octokit.repos.listTags({
+                owner: this.repoInfo.owner,
+                repo: this.repoInfo.repo,
+                per_page: 100,
+            });
+            const allTags = [];
+            // Extract tag names and fetch commit dates
+            for (const tag of tags) {
+                const tagName = tag.name || '';
+                let date = '';
+                // Get commit date from the tag's commit
+                try {
+                    const commitSha = tag.commit?.sha || '';
+                    if (commitSha) {
+                        const { data: commitData } = await this.octokit.git.getCommit({
+                            owner: this.repoInfo.owner,
+                            repo: this.repoInfo.repo,
+                            commit_sha: commitSha,
+                        });
+                        date = commitData.committer?.date || '';
+                    }
+                }
+                catch {
+                    // If we can't get the date, continue without it
+                }
+                allTags.push({ name: tagName, date });
+            }
+            return allTags;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get tags from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get tags from GitHub: ${String(error)}`);
+        }
+    }
+    /**
+     * Get all release names (optimized, no dates)
+     */
+    async getAllReleaseNames() {
+        try {
+            const { data: releases } = await this.octokit.repos.listReleases({
+                owner: this.repoInfo.owner,
+                repo: this.repoInfo.repo,
+                per_page: 100,
+            });
+            // Extract release tag names
+            const releaseNames = releases.map((release) => release.tag_name).filter((name) => name);
+            return releaseNames;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get release names from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get release names from GitHub: ${String(error)}`);
+        }
+    }
+    /**
+     * Get all releases with dates
+     */
+    async getAllReleases() {
+        try {
+            const { data: releases } = await this.octokit.repos.listReleases({
+                owner: this.repoInfo.owner,
+                repo: this.repoInfo.repo,
+                per_page: 100,
+            });
+            // Extract release tag names and published dates
+            const allReleases = releases.map((release) => ({
+                name: release.tag_name,
+                date: release.published_at || release.created_at || '',
+            }));
+            return allReleases;
+        }
+        catch (error) {
+            if (error instanceof Error) {
+                throw new Error(`Failed to get releases from GitHub: ${error.message}`);
+            }
+            throw new Error(`Failed to get releases from GitHub: ${String(error)}`);
+        }
+    }
+}
+exports.GitHubAPI = GitHubAPI;
+/**
+ * Detect GitHub from URL hostname
+ */
+function detectFromUrlByHostname(url) {
+    const hostname = url.hostname.toLowerCase();
+    if (hostname.includes('github.com')) {
+        return types_1.Platform.GITHUB;
+    }
+    return undefined;
+}
+/**
+ * Detect GitHub from URL by probing API endpoints
+ */
+async function headOk(url, logger) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    try {
+        const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (response.ok || response.status === 401 || response.status === 403) {
+            logger.debug(`GitHub detect: ${url} status ${response.status}`);
+            return true;
+        }
+    }
+    catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+            logger.debug(`GitHub detect timeout: ${url}`);
+        }
+    }
+    return false;
+}
+async function detectFromUrl(url, logger) {
+    const base = `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}`;
+    const paths = ['/api/v3', '/api'];
+    for (const path of paths) {
+        if (await headOk(`${base}${path}`, logger)) {
+            return types_1.Platform.GITHUB;
+        }
+    }
+    return undefined;
+}
+/**
+ * Determine base URL for GitHub API
+ */
+function determineBaseUrl(urls) {
+    const urlArray = Array.isArray(urls) ? urls : [urls];
+    // If explicitly provided base URL exists, use it (would be in the array)
+    for (const urlStr of urlArray) {
+        if (!urlStr)
+            continue;
+        try {
+            const url = new URL(urlStr);
+            // Check if this looks like an API URL
+            if (url.pathname.includes('/api')) {
+                return urlStr;
+            }
+        }
+        catch {
+            // Not a valid URL, skip
+        }
+    }
+    // Default GitHub API URL
+    return 'https://api.github.com';
+}
+
+
+/***/ }),
+
+/***/ 3696:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.HttpClient = void 0;
+const https = __importStar(__nccwpck_require__(5692));
+const http = __importStar(__nccwpck_require__(8611));
+/**
+ * HTTP client for making requests to platform APIs
+ */
+class HttpClient {
+    baseUrl;
+    token;
+    ignoreCertErrors;
+    logger;
+    constructor(options, logger) {
+        this.baseUrl = options.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+        this.token = options.token;
+        this.ignoreCertErrors = options.ignoreCertErrors;
+        this.logger = logger;
+    }
+    /**
+     * Make HTTP request
+     */
+    async request(method, path, body) {
+        const url = `${this.baseUrl}${path}`;
+        const urlObj = new URL(url);
+        const isHttps = urlObj.protocol === 'https:';
+        const client = isHttps ? https : http;
+        const headers = {
+            'User-Agent': 'git-action-tag-info',
+            Accept: 'application/json',
+        };
+        if (this.token) {
+            headers['Authorization'] = `token ${this.token}`;
+        }
+        if (body) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || (isHttps ? 443 : 80),
+            path: urlObj.pathname + urlObj.search,
+            method,
+            headers,
+        };
+        // Ignore certificate errors if requested (HTTPS only)
+        if (isHttps && this.ignoreCertErrors) {
+            options.rejectUnauthorized = false;
+        }
+        // Log request if verbose
+        if (this.logger.verbose) {
+            const sanitizedHeaders = { ...headers };
+            if (sanitizedHeaders.Authorization) {
+                sanitizedHeaders.Authorization = '***';
+            }
+            this.logger.debug(`HTTP ${method} ${url}`);
+            this.logger.debug(`Headers: ${JSON.stringify(sanitizedHeaders, null, 2)}`);
+            if (body) {
+                this.logger.debug(`Body: ${JSON.stringify(body, null, 2)}`);
+            }
+        }
+        return new Promise((resolve, reject) => {
+            const req = client.request(options, (res) => {
+                let responseBody = '';
+                res.on('data', (chunk) => {
+                    responseBody += chunk;
+                });
+                res.on('end', () => {
+                    const response = {
+                        statusCode: res.statusCode || 0,
+                        headers: res.headers,
+                        body: responseBody,
+                    };
+                    // Log response if verbose
+                    if (this.logger.verbose) {
+                        this.logger.debug(`HTTP Response: ${response.statusCode} ${res.statusMessage || ''}`);
+                        try {
+                            const parsedBody = JSON.parse(responseBody);
+                            this.logger.debug(`Response body: ${JSON.stringify(parsedBody, null, 2)}`);
+                        }
+                        catch {
+                            this.logger.debug(`Response body: ${responseBody.substring(0, 200)}...`);
+                        }
+                    }
+                    resolve(response);
+                });
+            });
+            req.on('error', (error) => {
+                if (this.logger.verbose) {
+                    this.logger.debug(`Request error: ${error.message}`);
+                }
+                reject(error);
+            });
+            if (body) {
+                req.write(JSON.stringify(body));
+            }
+            req.end();
+        });
+    }
+    /**
+     * GET request
+     */
+    async get(path) {
+        return this.request('GET', path);
+    }
+    /**
+     * POST request
+     */
+    async post(path, body) {
+        return this.request('POST', path, body);
+    }
+    /**
+     * DELETE request
+     */
+    async delete(path) {
+        return this.request('DELETE', path);
+    }
+}
+exports.HttpClient = HttpClient;
+
+
+/***/ }),
+
+/***/ 4875:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.LocalGitAPI = void 0;
+exports.detectFromUrlByHostname = detectFromUrlByHostname;
+exports.detectFromUrl = detectFromUrl;
+exports.determineBaseUrl = determineBaseUrl;
+const git_client_1 = __nccwpck_require__(7551);
+/**
+ * Local Git API client
+ */
+class LocalGitAPI {
+    repoInfo;
+    logger;
+    constructor(repoInfo, config, logger) {
+        if (!repoInfo.path) {
+            throw new Error('Local repository path is required');
+        }
+        this.repoInfo = repoInfo;
+        this.logger = logger;
+    }
+    /**
+     * Get tag information
+     */
+    async getTagInfo(tagName) {
+        if (!this.repoInfo.path) {
+            throw new Error('Local repository path is required');
+        }
+        return (0, git_client_1.getTagInfo)(tagName, this.repoInfo.path);
+    }
+    /**
+     * Get release information
+     * Releases are not supported for local repositories
+     */
+    async getReleaseInfo(_tagName) {
+        throw new Error('Releases are not supported for local repositories. Use tag_type: tags or query a remote repository.');
+    }
+    /**
+     * Get all tag names (optimized, no dates)
+     */
+    async getAllTagNames() {
+        if (!this.repoInfo.path) {
+            throw new Error('Local repository path is required');
+        }
+        return (0, git_client_1.getAllTags)(this.repoInfo.path);
+    }
+    /**
+     * Get all tags with dates
+     * Note: Local Git doesn't easily provide dates, so we return empty dates
+     */
+    async getAllTags() {
+        if (!this.repoInfo.path) {
+            throw new Error('Local repository path is required');
+        }
+        const tags = (0, git_client_1.getAllTags)(this.repoInfo.path);
+        // For local tags, we don't have dates easily available, so return empty dates
+        return tags.map((name) => ({ name, date: '' }));
+    }
+    /**
+     * Get all release names (optimized, no dates)
+     * Releases are not supported for local repositories
+     */
+    async getAllReleaseNames() {
+        throw new Error('Releases are not supported for local repositories');
+    }
+    /**
+     * Get all releases with dates
+     * Releases are not supported for local repositories
+     */
+    async getAllReleases() {
+        throw new Error('Releases are not supported for local repositories');
+    }
+}
+exports.LocalGitAPI = LocalGitAPI;
+/**
+ * Detect local Git repository (always returns undefined - handled by repo-utils)
+ */
+function detectFromUrlByHostname(_url) {
+    return undefined;
+}
+/**
+ * Detect local Git repository (always returns undefined - handled by repo-utils)
+ */
+async function detectFromUrl(_url, _logger) {
+    return undefined;
+}
+/**
+ * Determine base URL for local Git (not applicable)
+ */
+function determineBaseUrl(_urls) {
+    return undefined;
+}
+
+
+/***/ }),
+
+/***/ 1990:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createPlatformAPI = createPlatformAPI;
+const exec = __importStar(__nccwpck_require__(5236));
+const types_1 = __nccwpck_require__(8522);
+const github_1 = __nccwpck_require__(6473);
+const gitea_1 = __nccwpck_require__(4862);
+const bitbucket_1 = __nccwpck_require__(1737);
+const local_1 = __nccwpck_require__(4875);
+const platformProviders = [
+    {
+        type: types_1.Platform.GITEA,
+        detectFromUrlByHostname: gitea_1.detectFromUrlByHostname,
+        detectFromUrl: gitea_1.detectFromUrl,
+        createAPI: (repoInfo, config, logger) => new gitea_1.GiteaAPI(repoInfo, config, logger)
+    },
+    {
+        type: types_1.Platform.GITHUB,
+        detectFromUrlByHostname: github_1.detectFromUrlByHostname,
+        detectFromUrl: github_1.detectFromUrl,
+        createAPI: (repoInfo, config, logger) => new github_1.GitHubAPI(repoInfo, config, logger)
+    },
+    {
+        type: types_1.Platform.BITBUCKET,
+        detectFromUrlByHostname: bitbucket_1.detectFromUrlByHostname,
+        detectFromUrl: bitbucket_1.detectFromUrl,
+        createAPI: (repoInfo, config, logger) => new bitbucket_1.BitbucketAPI(repoInfo, config, logger)
+    }
+];
+/**
+ * Collect candidate URLs from repository URL, origin URL, and environment variables
+ */
+async function collectCandidateUrls(repoInfo, logger) {
+    const urls = [];
+    // Add repository URL if available
+    if (repoInfo.url) {
+        urls.push(repoInfo.url);
+    }
+    // Try to get origin URL from git
+    try {
+        const output = [];
+        await exec.exec('git', ['config', '--get', 'remote.origin.url'], {
+            silent: true,
+            listeners: {
+                stdout: (data) => {
+                    output.push(data.toString());
+                }
+            },
+            ignoreReturnCode: true
+        });
+        const originUrl = output.join('').trim();
+        if (originUrl && originUrl !== repoInfo.url) {
+            urls.push(originUrl);
+            logger.debug(`Added origin URL: ${originUrl}`);
+        }
+    }
+    catch {
+        // Git not available or no origin - skip
+    }
+    // Add environment variable URLs
+    const envUrls = [
+        process.env.GITHUB_SERVER_URL,
+        process.env.GITEA_SERVER_URL,
+        process.env.GITEA_API_URL
+    ].filter((url) => !!url);
+    for (const envUrl of envUrls) {
+        if (!urls.includes(envUrl)) {
+            urls.push(envUrl);
+            logger.debug(`Added environment URL: ${envUrl}`);
+        }
+    }
+    return urls;
+}
+async function resolvePlatform(repoInfo, explicitPlatform, logger) {
+    // If explicit platform is provided and not 'auto', use it
+    if (explicitPlatform && explicitPlatform !== 'auto') {
+        return explicitPlatform;
+    }
+    // If repoInfo has explicit platform (not 'auto'), use it
+    if (repoInfo.platform && repoInfo.platform !== 'auto') {
+        return repoInfo.platform;
+    }
+    // If we have a local path, we can't detect platform from URL
+    // This will be handled separately by checking if we should use LocalGitAPI
+    if (repoInfo.path && (!repoInfo.owner || !repoInfo.repo)) {
+        // This is a local-only repository, but we still need a platform for the API
+        // We'll default to GitHub for now, but LocalGitAPI will be used instead
+        logger.debug('Local repository detected, will use LocalGitAPI');
+        return types_1.Platform.GITHUB; // Placeholder, LocalGitAPI will be used
+    }
+    // Collect candidate URLs
+    const candidateUrls = await collectCandidateUrls(repoInfo, logger);
+    // First loop: Try detectFromUrlByHostname on each URL
+    for (const urlStr of candidateUrls) {
+        try {
+            const url = new URL(urlStr);
+            // Try detectFromUrlByHostname from each provider
+            for (const provider of platformProviders) {
+                const detected = provider.detectFromUrlByHostname(url);
+                if (detected) {
+                    logger.debug(`Detected platform ${detected} from hostname: ${url.hostname} (URL: ${urlStr})`);
+                    return detected;
+                }
+            }
+        }
+        catch {
+            logger.debug(`Could not parse URL for hostname detection: ${urlStr}`);
+        }
+    }
+    // Second loop: Try detectFromUrl (endpoint probing) on each URL
+    for (const urlStr of candidateUrls) {
+        try {
+            const url = new URL(urlStr);
+            // Try detectFromUrl from each provider
+            for (const provider of platformProviders) {
+                const detected = await provider.detectFromUrl(url, logger);
+                if (detected) {
+                    logger.debug(`Detected platform ${detected} from API probe: ${urlStr}`);
+                    return detected;
+                }
+            }
+        }
+        catch {
+            logger.debug(`Could not parse URL for detector probes: ${urlStr}`);
+        }
+    }
+    // Default to GitHub if we have owner/repo but couldn't detect
+    if (repoInfo.owner && repoInfo.repo) {
+        logger.debug('Could not detect platform, defaulting to GitHub');
+        return types_1.Platform.GITHUB;
+    }
+    // If we have a local path, we'll use LocalGitAPI (handled in createPlatformAPI)
+    logger.debug('Could not detect platform, will use LocalGitAPI if path is available');
+    return types_1.Platform.GITHUB; // Placeholder
+}
+async function createPlatformAPI(repoInfo, explicitPlatform, config, logger) {
+    // Check if this is a local-only repository (has path but no owner/repo)
+    if (repoInfo.path && (!repoInfo.owner || !repoInfo.repo)) {
+        // Use LocalGitAPI for local repositories
+        const platformConfig = {
+            type: types_1.Platform.GITHUB, // Placeholder, not used by LocalGitAPI
+            baseUrl: config.baseUrl,
+            token: config.token,
+            ignoreCertErrors: config.ignoreCertErrors,
+            verbose: config.verbose
+        };
+        const api = new local_1.LocalGitAPI(repoInfo, platformConfig, logger);
+        return { platform: types_1.Platform.GITHUB, api }; // Platform is placeholder for local
+    }
+    const platform = await resolvePlatform(repoInfo, explicitPlatform, logger);
+    // Find the provider for the resolved platform
+    const provider = platformProviders.find(p => p.type === platform);
+    if (!provider) {
+        throw new Error(`Unsupported platform: ${platform}`);
+    }
+    // Collect candidate URLs for base URL determination
+    const candidateUrls = await collectCandidateUrls(repoInfo, logger);
+    // If explicit baseUrl is provided, prepend it to the array
+    const urlsForBaseUrl = config.baseUrl ? [config.baseUrl, ...candidateUrls] : candidateUrls;
+    // Determine base URL using the platform's internal function
+    let determineBaseUrlFn;
+    switch (platform) {
+        case types_1.Platform.GITHUB:
+            determineBaseUrlFn = github_1.determineBaseUrl;
+            break;
+        case types_1.Platform.GITEA:
+            determineBaseUrlFn = gitea_1.determineBaseUrl;
+            break;
+        case types_1.Platform.BITBUCKET:
+            determineBaseUrlFn = bitbucket_1.determineBaseUrl;
+            break;
+        default:
+            throw new Error(`Unsupported platform: ${platform}`);
+    }
+    const baseUrl = determineBaseUrlFn(urlsForBaseUrl);
+    const platformConfig = {
+        type: platform,
+        baseUrl,
+        token: config.token,
+        ignoreCertErrors: config.ignoreCertErrors,
+        verbose: config.verbose
+    };
+    const api = provider.createAPI(repoInfo, platformConfig, logger);
+    return { platform, api, baseUrl };
+}
+
+
+/***/ }),
+
+/***/ 4595:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parseRepository = parseRepository;
+exports.getLocalRepositoryInfo = getLocalRepositoryInfo;
+exports.getRepositoryInfo = getRepositoryInfo;
+const path = __importStar(__nccwpck_require__(6928));
+const exec = __importStar(__nccwpck_require__(5236));
+const io = __importStar(__nccwpck_require__(4994));
+const types_1 = __nccwpck_require__(8522);
+/**
+ * Parse repository URL or owner/repo format
+ */
+function parseRepository(repository, logger) {
+    if (!repository) {
+        return undefined;
+    }
+    logger.debug(`Parsing repository: ${repository}`);
+    // Check if it's a URL
+    const isUrl = repository.startsWith('http://') ||
+        repository.startsWith('https://') ||
+        repository.startsWith('git@');
+    if (isUrl) {
+        // Try to parse as URL
+        try {
+            // Handle git@ URLs by converting to https:// format for parsing
+            let urlStr = repository;
+            if (repository.startsWith('git@')) {
+                // Convert git@host:owner/repo to https://host/owner/repo
+                const match = repository.match(/^git@([^:]+):(.+)$/);
+                if (match) {
+                    urlStr = `https://${match[1]}/${match[2]}`;
+                }
+            }
+            const url = new URL(urlStr);
+            // Extract owner/repo from path
+            const pathParts = url.pathname.split('/').filter(p => p);
+            if (pathParts.length >= 2) {
+                const owner = pathParts[0];
+                const repo = pathParts[1].replace(/\.git$/, '');
+                logger.debug(`Parsed URL: ${repository} -> ${owner}/${repo}`);
+                return {
+                    owner,
+                    repo,
+                    url: repository,
+                    platform: 'auto' // Platform detection is handled by the factory
+                };
+            }
+        }
+        catch {
+            // Not a valid URL, try owner/repo format
+        }
+    }
+    // Try owner/repo format (e.g., "owner/repo")
+    const parts = repository.split('/');
+    if (parts.length === 2 && !isUrl) {
+        logger.debug(`Parsed as owner/repo format: ${parts[0]}/${parts[1]}`);
+        return {
+            owner: parts[0],
+            repo: parts[1],
+            platform: 'auto' // Platform detection is handled by the factory
+        };
+    }
+    // Check if it's a local path
+    if (!isUrl) {
+        const resolvedPath = path.isAbsolute(repository)
+            ? repository
+            : path.resolve(process.cwd(), repository);
+        logger.debug(`Detected local repository path: ${resolvedPath}`);
+        return {
+            owner: '', // Will be set by getLocalRepositoryInfo if remote exists
+            repo: '',
+            platform: 'auto',
+            path: resolvedPath
+        };
+    }
+    logger.warning(`Could not parse repository format: ${repository}`);
+    return undefined;
+}
+/**
+ * Get repository info from local Git repository
+ */
+async function getLocalRepositoryInfo(logger) {
+    const gitPath = await io.which('git', true);
+    if (!gitPath) {
+        logger.debug('Git not found in PATH');
+        return undefined;
+    }
+    // Check if we're in a Git repository
+    try {
+        const exitCode = await exec.exec('git', ['rev-parse', '--git-dir'], {
+            silent: true,
+            ignoreReturnCode: true
+        });
+        if (exitCode !== 0) {
+            logger.debug('Not in a Git repository');
+            return undefined;
+        }
+        // Get the repository root path
+        const output = [];
+        await exec.exec('git', ['rev-parse', '--show-toplevel'], {
+            silent: true,
+            listeners: {
+                stdout: (data) => {
+                    output.push(data.toString());
+                }
+            }
+        });
+        const repoPath = output.join('').trim();
+        // Get remote URL - if no remote origin, return local path only
+        let remoteUrl = '';
+        try {
+            const remoteOutput = [];
+            await exec.exec('git', ['config', '--get', 'remote.origin.url'], {
+                silent: true,
+                listeners: {
+                    stdout: (data) => {
+                        remoteOutput.push(data.toString());
+                    }
+                }
+            });
+            remoteUrl = remoteOutput.join('').trim();
+        }
+        catch {
+            logger.debug('No remote origin found, will use local git');
+            // No remote origin - return local path info
+            return {
+                owner: '',
+                repo: '',
+                platform: 'auto',
+                path: repoPath
+            };
+        }
+        // If we have a remote URL, parse it
+        if (remoteUrl) {
+            const parsed = parseRepository(remoteUrl, logger);
+            if (parsed) {
+                // Include local path for local operations
+                return {
+                    ...parsed,
+                    path: repoPath
+                };
+            }
+        }
+        // Fallback: return local path only
+        return {
+            owner: '',
+            repo: '',
+            platform: 'auto',
+            path: repoPath
+        };
+    }
+    catch (error) {
+        logger.debug(`Error checking local repository: ${error}`);
+        return undefined;
+    }
+}
+/**
+ * Get full repository information
+ */
+async function getRepositoryInfo(repository, platform, owner, repo, logger) {
+    let repoInfo;
     // If separate inputs are provided, use them
     if (platform && owner && repo) {
         const platformEnum = platform.toLowerCase();
         if (!Object.values(types_1.Platform).includes(platformEnum)) {
             throw new Error(`Unsupported platform: ${platform}. Supported: ${Object.values(types_1.Platform).join(', ')}`);
         }
-        return {
-            type: 'remote',
-            platform: platformEnum,
+        repoInfo = {
             owner,
             repo,
-            baseUrl: baseUrl || (platformEnum === types_1.Platform.GITEA ? undefined : undefined),
-            token: finalToken,
-            ignoreCertErrors,
+            platform: platformEnum, // Explicit platform, not 'auto'
         };
+        logger.debug(`Using separate inputs: ${owner}/${repo} on ${platformEnum}`);
     }
-    // If repository input is provided
-    if (repository) {
-        if (isUrl(repository)) {
-            // Remote repository
-            const detectedPlatform = detectPlatformFromUrl(repository);
-            if (detectedPlatform === types_1.Platform.GITHUB) {
-                const parsed = parseGitHubUrl(repository);
-                if (!parsed) {
-                    throw new Error(`Failed to parse GitHub URL: ${repository}`);
-                }
-                return {
-                    type: 'remote',
-                    platform: types_1.Platform.GITHUB,
-                    owner: parsed.owner,
-                    repo: parsed.repo,
-                    token: finalToken,
-                    ignoreCertErrors,
-                };
-            }
-            if (detectedPlatform === types_1.Platform.BITBUCKET) {
-                const parsed = parseBitbucketUrl(repository);
-                if (!parsed) {
-                    throw new Error(`Failed to parse Bitbucket URL: ${repository}`);
-                }
-                return {
-                    type: 'remote',
-                    platform: types_1.Platform.BITBUCKET,
-                    owner: parsed.owner,
-                    repo: parsed.repo,
-                    token: finalToken,
-                    ignoreCertErrors,
-                };
-            }
-            // Gitea (default for unknown URLs or explicit Gitea)
-            const parsed = parseGiteaUrl(repository, baseUrl);
-            if (!parsed) {
-                throw new Error(`Failed to parse Gitea URL: ${repository}`);
-            }
-            return {
-                type: 'remote',
-                platform: types_1.Platform.GITEA,
-                owner: parsed.owner,
-                repo: parsed.repo,
-                baseUrl: parsed.baseUrl,
-                token: finalToken,
-                ignoreCertErrors,
+    else if (repository) {
+        // Try to parse provided repository
+        repoInfo = parseRepository(repository, logger);
+    }
+    // If not provided or couldn't parse, try local repository
+    if (!repoInfo) {
+        repoInfo = await getLocalRepositoryInfo(logger);
+    }
+    // If still no info, try environment variables as fallback
+    if (!repoInfo) {
+        // Check Gitea first (since Gitea Actions sets GITHUB_REPOSITORY for compatibility)
+        const giteaRepo = process.env.GITEA_REPOSITORY;
+        const giteaServerUrl = process.env.GITEA_SERVER_URL || process.env.GITEA_API_URL;
+        const githubServerUrl = process.env.GITHUB_SERVER_URL;
+        if (giteaRepo) {
+            const [owner, repo] = giteaRepo.split('/');
+            repoInfo = {
+                owner,
+                repo,
+                platform: 'auto' // Platform detection is handled by the factory
             };
+            logger.debug(`Using GITEA_REPOSITORY: ${owner}/${repo}`);
         }
-        else {
-            // Local repository path
-            const resolvedPath = path.isAbsolute(repository)
-                ? repository
-                : path.resolve(process.cwd(), repository);
-            return {
-                type: 'local',
-                path: resolvedPath,
+        else if (giteaServerUrl || (githubServerUrl && !githubServerUrl.includes('github.com'))) {
+            // Gitea server URL or GITHUB_SERVER_URL set to non-GitHub URL indicates Gitea
+            const githubRepo = process.env.GITHUB_REPOSITORY;
+            if (githubRepo) {
+                const [owner, repo] = githubRepo.split('/');
+                repoInfo = {
+                    owner,
+                    repo,
+                    platform: 'auto' // Platform detection is handled by the factory
+                };
+                logger.debug(`Using GITHUB_REPOSITORY with Gitea server URL: ${owner}/${repo}`);
+            }
+        }
+        else if (process.env.GITHUB_REPOSITORY) {
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+            repoInfo = {
+                owner,
+                repo,
+                platform: types_1.Platform.GITHUB, // GitHub Actions context
             };
+            logger.debug(`Using GITHUB_REPOSITORY: ${owner}/${repo}`);
         }
     }
-    // Default: try to use GitHub Actions context
-    const githubRepo = process.env.GITHUB_REPOSITORY;
-    if (githubRepo) {
-        const [owner, repo] = githubRepo.split('/');
-        return {
-            type: 'remote',
-            platform: types_1.Platform.GITHUB,
-            owner,
-            repo,
-            token: finalToken,
-            ignoreCertErrors,
-        };
+    // If we still don't have info, throw error
+    if (!repoInfo) {
+        throw new Error('Could not determine repository information. Please provide repository input or run in a Git repository.');
     }
-    throw new Error('Repository not specified. Provide either repository (URL or path), or platform/owner/repo inputs, or run in GitHub Actions context.');
+    logger.info(`Repository: ${repoInfo.owner || 'local'}/${repoInfo.repo || repoInfo.path || 'unknown'}`);
+    return repoInfo;
 }
 
 
@@ -29166,7 +29960,7 @@ function parseSemver(tagName) {
     // Remove 'v' prefix if present
     const cleaned = tagName.replace(/^v/i, '');
     // Match semver pattern: major.minor.patch[-prerelease][+build]
-    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z\-\.]+))?(?:\+([0-9A-Za-z\-\.]+))?$/;
+    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
     const match = cleaned.match(semverRegex);
     if (!match) {
         return null;
@@ -29285,122 +30079,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.resolveLatestTag = resolveLatestTag;
 const core = __importStar(__nccwpck_require__(7484));
-const types_1 = __nccwpck_require__(8522);
-const git_client_1 = __nccwpck_require__(7551);
-const github_client_1 = __nccwpck_require__(7890);
-const gitea_client_1 = __nccwpck_require__(4485);
-const bitbucket_client_1 = __nccwpck_require__(1420);
 const semver_1 = __nccwpck_require__(1475);
 const format_matcher_1 = __nccwpck_require__(839);
-/**
- * Get all items (tags or releases) from repository based on configuration
- */
-async function getAllItemsFromRepo(config, itemType) {
-    // Releases are not supported for local repositories
-    if (itemType === 'release' && config.type === 'local') {
-        throw new Error('Releases are not supported for local repositories');
-    }
-    if (config.type === 'local') {
-        if (!config.path) {
-            throw new Error('Local repository path is required');
-        }
-        if (itemType === 'release') {
-            throw new Error('Releases are not supported for local repositories');
-        }
-        const tags = (0, git_client_1.getAllTags)(config.path);
-        // For local tags, we don't have dates easily available, so return empty dates
-        return tags.map((name) => ({ name, date: '' }));
-    }
-    if (config.type === 'remote') {
-        if (!config.platform || !config.owner || !config.repo) {
-            throw new Error('Remote repository configuration is incomplete');
-        }
-        if (itemType === 'release') {
-            // Route to release listing functions
-            switch (config.platform) {
-                case types_1.Platform.GITHUB:
-                    return await (0, github_client_1.getAllReleases)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                case types_1.Platform.GITEA:
-                    if (!config.baseUrl) {
-                        throw new Error('Gitea base URL is required');
-                    }
-                    return await (0, gitea_client_1.getAllReleases)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-                case types_1.Platform.BITBUCKET:
-                    return await (0, bitbucket_client_1.getAllReleases)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                default:
-                    throw new Error(`Unsupported platform: ${config.platform}`);
-            }
-        }
-        else {
-            // Route to tag listing functions
-            switch (config.platform) {
-                case types_1.Platform.GITHUB:
-                    return await (0, github_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                case types_1.Platform.GITEA:
-                    if (!config.baseUrl) {
-                        throw new Error('Gitea base URL is required');
-                    }
-                    return await (0, gitea_client_1.getAllTags)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-                case types_1.Platform.BITBUCKET:
-                    return await (0, bitbucket_client_1.getAllTags)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                default:
-                    throw new Error(`Unsupported platform: ${config.platform}`);
-            }
-        }
-    }
-    throw new Error('Invalid repository configuration');
-}
-/**
- * Get all item names (tags or releases) from repository (optimized, no dates)
- * This is used for efficient semver resolution without fetching dates
- */
-async function getAllItemNamesFromRepo(config, itemType) {
-    // Releases are not supported for local repositories
-    if (itemType === 'release' && config.type === 'local') {
-        throw new Error('Releases are not supported for local repositories');
-    }
-    if (config.type === 'local') {
-        if (!config.path) {
-            throw new Error('Local repository path is required');
-        }
-        if (itemType === 'release') {
-            throw new Error('Releases are not supported for local repositories');
-        }
-        return (0, git_client_1.getAllTags)(config.path);
-    }
-    if (config.type === 'remote') {
-        if (!config.platform || !config.owner || !config.repo) {
-            throw new Error('Remote repository configuration is incomplete');
-        }
-        if (itemType === 'release') {
-            // Route to release name listing functions
-            switch (config.platform) {
-                case types_1.Platform.GITHUB:
-                    return await (0, github_client_1.getAllReleaseNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                case types_1.Platform.GITEA:
-                    if (!config.baseUrl) {
-                        throw new Error('Gitea base URL is required');
-                    }
-                    return await (0, gitea_client_1.getAllReleaseNames)(config.owner, config.repo, config.baseUrl, config.token, config.ignoreCertErrors);
-                case types_1.Platform.BITBUCKET:
-                    return await (0, bitbucket_client_1.getAllReleaseNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-                default:
-                    throw new Error(`Unsupported platform: ${config.platform}`);
-            }
-        }
-        else {
-            // For GitHub tags, use the optimized function that doesn't fetch dates
-            if (config.platform === types_1.Platform.GITHUB) {
-                return await (0, github_client_1.getAllTagNames)(config.owner, config.repo, config.token, config.ignoreCertErrors);
-            }
-            // For other platforms, we need to fetch tags with dates (they're efficient anyway)
-            // but we'll extract just the names
-            const tags = await getAllItemsFromRepo(config, 'tags');
-            return tags.map((tag) => tag.name);
-        }
-    }
-    throw new Error('Invalid repository configuration');
-}
 /**
  * Filter tags with fallback pattern support
  * Tries each pattern in order until one matches tags
@@ -29434,11 +30114,11 @@ async function filterTagsWithFallback(tagNames, patterns, context) {
 }
 /**
  * Resolve "latest" item name (tag or release)
- * Strategy: Try semver first (using fast name-only fetch for GitHub), then fallback to date
+ * Strategy: Try semver first (using fast name-only fetch when available), then fallback to date
  * If tagFormat is provided, filter items by format before sorting
  * If tagFormat is an array, try each pattern in order as fallbacks
  */
-async function resolveLatestTag(config, tagFormat, itemType = 'tags') {
+async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
     const itemLabel = itemType === 'release' ? 'release' : 'tag';
     core.info(`Resolving latest ${itemLabel}...`);
     // Normalize tagFormat to array for consistent handling
@@ -29456,18 +30136,18 @@ async function resolveLatestTag(config, tagFormat, itemType = 'tags') {
             core.info(`Filtering tags by format patterns (fallback order): ${formatPatterns.join(', ')}`);
         }
     }
-    // Optimization: For GitHub, first try to get just item names (fast, no dates)
+    // Optimization: For tags, first try to get just item names (fast, no dates)
     // and check if we can resolve using semver without fetching dates
-    if (config.type === 'remote' && config.platform === types_1.Platform.GITHUB && itemType === 'tags') {
+    if (itemType === 'tags') {
         try {
-            const itemNames = await getAllItemNamesFromRepo(config, itemType);
+            const itemNames = await platformAPI.getAllTagNames();
             if (itemNames.length === 0) {
                 throw new Error(`No ${itemLabel}s found in repository`);
             }
             // Apply format filtering if provided (with fallback support)
             let filteredItemNames = itemNames;
             if (formatPatterns) {
-                filteredItemNames = await filterTagsWithFallback(itemNames, formatPatterns, 'GitHub optimized path');
+                filteredItemNames = await filterTagsWithFallback(itemNames, formatPatterns, 'optimized path');
             }
             // Filter semver items from the (potentially format-filtered) items
             const semverItems = filteredItemNames.filter((itemName) => (0, semver_1.isSemver)(itemName));
@@ -29491,8 +30171,10 @@ async function resolveLatestTag(config, tagFormat, itemType = 'tags') {
             core.warning(`Optimized ${itemLabel} name fetch failed, using full ${itemLabel} fetch: ${error instanceof Error ? error.message : 'unknown error'}`);
         }
     }
-    // For non-GitHub platforms, releases, or if semver failed, get items with dates
-    const allItems = await getAllItemsFromRepo(config, itemType);
+    // For releases or if semver failed, get items with dates
+    const allItems = itemType === 'tags'
+        ? await platformAPI.getAllTags()
+        : await platformAPI.getAllReleases();
     if (allItems.length === 0) {
         throw new Error(`No ${itemLabel}s found in repository`);
     }

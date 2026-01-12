@@ -15,7 +15,7 @@ function parseSemver(tagName) {
     // Remove 'v' prefix if present
     const cleaned = tagName.replace(/^v/i, '');
     // Match semver pattern: major.minor.patch[-prerelease][+build]
-    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z\-\.]+))?(?:\+([0-9A-Za-z\-\.]+))?$/;
+    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
     const match = cleaned.match(semverRegex);
     if (!match) {
         return null;

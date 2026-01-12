@@ -70,3 +70,60 @@ export interface HttpResponse {
   body: string;
 }
 
+
+/**
+ * Platform API interface for tag and release operations
+ */
+export interface PlatformAPI {
+  /**
+   * Get tag information
+   */
+  getTagInfo(tagName: string): Promise<ItemInfo>;
+
+  /**
+   * Get release information
+   */
+  getReleaseInfo(tagName: string): Promise<ItemInfo>;
+
+  /**
+   * Get all tag names (optimized, no dates)
+   */
+  getAllTagNames(): Promise<string[]>;
+
+  /**
+   * Get all tags with dates
+   */
+  getAllTags(): Promise<Array<{ name: string; date: string }>>;
+
+  /**
+   * Get all release names (optimized, no dates)
+   */
+  getAllReleaseNames(): Promise<string[]>;
+
+  /**
+   * Get all releases with dates
+   */
+  getAllReleases(): Promise<Array<{ name: string; date: string }>>;
+}
+
+/**
+ * Platform configuration
+ */
+export interface PlatformConfig {
+  type: Platform;
+  baseUrl?: string;
+  token?: string;
+  ignoreCertErrors: boolean;
+  verbose: boolean;
+}
+
+/**
+ * Repository information for factory pattern
+ */
+export interface RepositoryInfo {
+  owner: string;
+  repo: string;
+  url?: string;
+  platform: Platform | 'auto';
+  path?: string; // For local repositories
+}

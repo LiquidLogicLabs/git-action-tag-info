@@ -1,153 +1,7 @@
 import * as core from '@actions/core';
-import { RepoConfig, Platform } from './types';
-import { getAllTags as getLocalTags } from './git-client';
-import { getAllTags as getGithubTags, getAllTagNames as getGithubTagNames, getAllReleaseNames as getGithubReleaseNames, getAllReleases as getGithubReleases } from './github-client';
-import { getAllTags as getGiteaTags, getAllReleaseNames as getGiteaReleaseNames, getAllReleases as getGiteaReleases } from './gitea-client';
-import { getAllTags as getBitbucketTags, getAllReleaseNames as getBitbucketReleaseNames, getAllReleases as getBitbucketReleases } from './bitbucket-client';
+import { PlatformAPI, Platform } from './types';
 import { isSemver, sortTagsBySemver } from './semver';
 import { filterTagsByFormat } from './format-matcher';
-
-/**
- * Get all items (tags or releases) from repository based on configuration
- */
-async function getAllItemsFromRepo(
-  config: RepoConfig,
-  itemType: 'tags' | 'release'
-): Promise<Array<{ name: string; date: string }>> {
-  // Releases are not supported for local repositories
-  if (itemType === 'release' && config.type === 'local') {
-    throw new Error('Releases are not supported for local repositories');
-  }
-
-  if (config.type === 'local') {
-    if (!config.path) {
-      throw new Error('Local repository path is required');
-    }
-    if (itemType === 'release') {
-      throw new Error('Releases are not supported for local repositories');
-    }
-    const tags = getLocalTags(config.path);
-    // For local tags, we don't have dates easily available, so return empty dates
-    return tags.map((name) => ({ name, date: '' }));
-  }
-
-  if (config.type === 'remote') {
-    if (!config.platform || !config.owner || !config.repo) {
-      throw new Error('Remote repository configuration is incomplete');
-    }
-
-    if (itemType === 'release') {
-      // Route to release listing functions
-      switch (config.platform) {
-        case Platform.GITHUB:
-          return await getGithubReleases(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        case Platform.GITEA:
-          if (!config.baseUrl) {
-            throw new Error('Gitea base URL is required');
-          }
-          return await getGiteaReleases(
-            config.owner,
-            config.repo,
-            config.baseUrl,
-            config.token,
-            config.ignoreCertErrors
-          );
-        case Platform.BITBUCKET:
-          return await getBitbucketReleases(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        default:
-          throw new Error(`Unsupported platform: ${config.platform}`);
-      }
-    } else {
-      // Route to tag listing functions
-      switch (config.platform) {
-        case Platform.GITHUB:
-          return await getGithubTags(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        case Platform.GITEA:
-          if (!config.baseUrl) {
-            throw new Error('Gitea base URL is required');
-          }
-          return await getGiteaTags(
-            config.owner,
-            config.repo,
-            config.baseUrl,
-            config.token,
-            config.ignoreCertErrors
-          );
-        case Platform.BITBUCKET:
-          return await getBitbucketTags(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        default:
-          throw new Error(`Unsupported platform: ${config.platform}`);
-      }
-    }
-  }
-
-  throw new Error('Invalid repository configuration');
-}
-
-/**
- * Get all item names (tags or releases) from repository (optimized, no dates)
- * This is used for efficient semver resolution without fetching dates
- */
-async function getAllItemNamesFromRepo(
-  config: RepoConfig,
-  itemType: 'tags' | 'release'
-): Promise<string[]> {
-  // Releases are not supported for local repositories
-  if (itemType === 'release' && config.type === 'local') {
-    throw new Error('Releases are not supported for local repositories');
-  }
-
-  if (config.type === 'local') {
-    if (!config.path) {
-      throw new Error('Local repository path is required');
-    }
-    if (itemType === 'release') {
-      throw new Error('Releases are not supported for local repositories');
-    }
-    return getLocalTags(config.path);
-  }
-
-  if (config.type === 'remote') {
-    if (!config.platform || !config.owner || !config.repo) {
-      throw new Error('Remote repository configuration is incomplete');
-    }
-
-    if (itemType === 'release') {
-      // Route to release name listing functions
-      switch (config.platform) {
-        case Platform.GITHUB:
-          return await getGithubReleaseNames(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        case Platform.GITEA:
-          if (!config.baseUrl) {
-            throw new Error('Gitea base URL is required');
-          }
-          return await getGiteaReleaseNames(
-            config.owner,
-            config.repo,
-            config.baseUrl,
-            config.token,
-            config.ignoreCertErrors
-          );
-        case Platform.BITBUCKET:
-          return await getBitbucketReleaseNames(config.owner, config.repo, config.token, config.ignoreCertErrors);
-        default:
-          throw new Error(`Unsupported platform: ${config.platform}`);
-      }
-    } else {
-      // For GitHub tags, use the optimized function that doesn't fetch dates
-      if (config.platform === Platform.GITHUB) {
-        return await getGithubTagNames(config.owner, config.repo, config.token, config.ignoreCertErrors);
-      }
-
-      // For other platforms, we need to fetch tags with dates (they're efficient anyway)
-      // but we'll extract just the names
-      const tags = await getAllItemsFromRepo(config, 'tags');
-      return tags.map((tag) => tag.name);
-    }
-  }
-
-  throw new Error('Invalid repository configuration');
-}
 
 /**
  * Filter tags with fallback pattern support
@@ -198,12 +52,12 @@ async function filterTagsWithFallback(
 
 /**
  * Resolve "latest" item name (tag or release)
- * Strategy: Try semver first (using fast name-only fetch for GitHub), then fallback to date
+ * Strategy: Try semver first (using fast name-only fetch when available), then fallback to date
  * If tagFormat is provided, filter items by format before sorting
  * If tagFormat is an array, try each pattern in order as fallbacks
  */
 export async function resolveLatestTag(
-  config: RepoConfig,
+  platformAPI: PlatformAPI,
   tagFormat?: string | string[],
   itemType: 'tags' | 'release' = 'tags'
 ): Promise<string> {
@@ -226,11 +80,11 @@ export async function resolveLatestTag(
     }
   }
 
-  // Optimization: For GitHub, first try to get just item names (fast, no dates)
+  // Optimization: For tags, first try to get just item names (fast, no dates)
   // and check if we can resolve using semver without fetching dates
-  if (config.type === 'remote' && config.platform === Platform.GITHUB && itemType === 'tags') {
+  if (itemType === 'tags') {
     try {
-      const itemNames = await getAllItemNamesFromRepo(config, itemType);
+      const itemNames = await platformAPI.getAllTagNames();
 
       if (itemNames.length === 0) {
         throw new Error(`No ${itemLabel}s found in repository`);
@@ -239,11 +93,11 @@ export async function resolveLatestTag(
       // Apply format filtering if provided (with fallback support)
       let filteredItemNames = itemNames;
       if (formatPatterns) {
-        filteredItemNames = await filterTagsWithFallback(itemNames, formatPatterns, 'GitHub optimized path');
+        filteredItemNames = await filterTagsWithFallback(itemNames, formatPatterns, 'optimized path');
       }
 
       // Filter semver items from the (potentially format-filtered) items
-      const semverItems = filteredItemNames.filter((itemName) => isSemver(itemName));
+      const semverItems = filteredItemNames.filter((itemName: string) => isSemver(itemName));
 
       if (semverItems.length > 0) {
         core.info(`Found ${semverItems.length} semver ${itemLabel}s, using semver comparison (optimized: no date fetching needed)`);
@@ -266,8 +120,10 @@ export async function resolveLatestTag(
     }
   }
 
-  // For non-GitHub platforms, releases, or if semver failed, get items with dates
-  const allItems = await getAllItemsFromRepo(config, itemType);
+  // For releases or if semver failed, get items with dates
+  const allItems = itemType === 'tags'
+    ? await platformAPI.getAllTags()
+    : await platformAPI.getAllReleases();
 
   if (allItems.length === 0) {
     throw new Error(`No ${itemLabel}s found in repository`);
@@ -276,20 +132,20 @@ export async function resolveLatestTag(
   // Apply format filtering if provided (with fallback support)
   let filteredItems = allItems;
   if (formatPatterns) {
-    const allItemNames = allItems.map((item) => item.name);
+    const allItemNames = allItems.map((item: { name: string; date: string }) => item.name);
     const filteredItemNames = await filterTagsWithFallback(allItemNames, formatPatterns, `full ${itemLabel} fetch path`);
     
     // Filter items to only those matching the format
-    filteredItems = allItems.filter((item) => filteredItemNames.includes(item.name));
+    filteredItems = allItems.filter((item: { name: string; date: string }) => filteredItemNames.includes(item.name));
   }
 
   // Filter semver items (in case we didn't check earlier)
-  const semverItems = filteredItems.filter((item) => isSemver(item.name));
+  const semverItems = filteredItems.filter((item: { name: string; date: string }) => isSemver(item.name));
 
   if (semverItems.length > 0) {
     core.info(`Found ${semverItems.length} semver ${itemLabel}s, using semver comparison`);
     // Sort by semver (highest first)
-    const sorted = sortTagsBySemver(semverItems.map((t) => t.name));
+    const sorted = sortTagsBySemver(semverItems.map((t: { name: string; date: string }) => t.name));
     const latest = sorted[0];
     core.info(`Latest semver ${itemLabel}: ${latest}`);
     return latest;
@@ -297,11 +153,11 @@ export async function resolveLatestTag(
 
   // Fallback to date-based sorting
   core.info(`No semver ${itemLabel}s found, falling back to date-based sorting`);
-  const itemsWithDates = filteredItems.filter((item) => item.date);
+  const itemsWithDates = filteredItems.filter((item: { name: string; date: string }) => item.date);
 
   if (itemsWithDates.length > 0) {
     // Sort by date (most recent first)
-    const sorted = itemsWithDates.sort((a, b) => {
+    const sorted = itemsWithDates.sort((a: { name: string; date: string }, b: { name: string; date: string }) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       return dateB - dateA; // Descending order
@@ -313,7 +169,7 @@ export async function resolveLatestTag(
 
   // If no dates available, return the last item alphabetically (fallback)
   core.warning('No date information available, using alphabetical order');
-  const sorted = filteredItems.map((t) => t.name).sort();
+  const sorted = filteredItems.map((t: { name: string; date: string }) => t.name).sort();
   return sorted[sorted.length - 1];
 }
 

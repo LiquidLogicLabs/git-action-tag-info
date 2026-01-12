@@ -61,7 +61,7 @@ function createOctokit(token, ignoreCertErrors = false) {
                 }
                 return false;
             },
-            onSecondaryRateLimit: (retryAfter, options, octokit) => {
+            onSecondaryRateLimit: (retryAfter, options, _octokit) => {
                 core.warning(`Secondary rate limit detected for request ${options.method} ${options.url}. Retrying after ${retryAfter} seconds...`);
                 // Always retry secondary rate limits (abuse detection)
                 return true;

@@ -22,12 +22,24 @@ function execGit(command, repoPath) {
     }
 }
 /**
- * Check if tag exists
+ * Check if tag exists locally
  */
 function tagExists(tagName, repoPath) {
     try {
         execGit(`rev-parse --verify --quiet refs/tags/${tagName}`, repoPath);
         return true;
+    }
+    catch {
+        return false;
+    }
+}
+/**
+ * Check if tag exists on remote
+ */
+function tagExistsOnRemote(tagName, remote, repoPath) {
+    try {
+        const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
+        return output.trim().length > 0;
     }
     catch {
         return false;

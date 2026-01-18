@@ -4,6 +4,7 @@ import { throttling } from '@octokit/plugin-throttling';
 import * as core from '@actions/core';
 import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform } from '../types';
 import { Logger } from '../logger';
+import { tryGitLsRemoteFallback } from './git-fallback';
 
 // Create Octokit with throttling plugin for automatic rate limit handling
 const ThrottledOctokit = Octokit.plugin(throttling);
@@ -122,6 +123,12 @@ export class GitHubAPI implements PlatformAPI {
     } catch (error: unknown) {
       // Handle 404 errors (tag doesn't exist)
       if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+        // Try fallback: check remote tags via git ls-remote if we have a repository URL
+        const fallbackResult = tryGitLsRemoteFallback(tagName, this.repoInfo.url, this.logger);
+        if (fallbackResult) {
+          return fallbackResult;
+        }
+
         return {
           exists: false,
           name: tagName,

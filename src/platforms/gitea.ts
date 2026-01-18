@@ -1,6 +1,7 @@
 import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform } from '../types';
 import { Logger } from '../logger';
 import { HttpClient } from './http-client';
+import { tryGitLsRemoteFallback } from './git-fallback';
 
 /**
  * Gitea API client
@@ -45,6 +46,12 @@ export class GiteaAPI implements PlatformAPI {
       const response = await this.client.get(url);
 
       if (response.statusCode === 404) {
+        // Try fallback: check remote tags via git ls-remote if we have a repository URL
+        const fallbackResult = tryGitLsRemoteFallback(tagName, this.repoInfo.url, this.logger);
+        if (fallbackResult) {
+          return fallbackResult;
+        }
+        
         return {
           exists: false,
           name: tagName,

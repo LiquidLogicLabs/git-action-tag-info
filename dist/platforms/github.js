@@ -42,6 +42,7 @@ const rest_1 = require("@octokit/rest");
 const plugin_throttling_1 = require("@octokit/plugin-throttling");
 const core = __importStar(require("@actions/core"));
 const types_1 = require("../types");
+const git_fallback_1 = require("./git-fallback");
 // Create Octokit with throttling plugin for automatic rate limit handling
 const ThrottledOctokit = rest_1.Octokit.plugin(plugin_throttling_1.throttling);
 /**
@@ -143,6 +144,11 @@ class GitHubAPI {
         catch (error) {
             // Handle 404 errors (tag doesn't exist)
             if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,

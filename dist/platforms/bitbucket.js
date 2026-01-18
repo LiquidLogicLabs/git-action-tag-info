@@ -39,6 +39,7 @@ exports.detectFromUrl = detectFromUrl;
 exports.determineBaseUrl = determineBaseUrl;
 const https = __importStar(require("https"));
 const types_1 = require("../types");
+const git_fallback_1 = require("./git-fallback");
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
  */
@@ -130,6 +131,11 @@ class BitbucketAPI {
         try {
             const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
             if (response.statusCode === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,

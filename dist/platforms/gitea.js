@@ -6,6 +6,7 @@ exports.detectFromUrl = detectFromUrl;
 exports.determineBaseUrl = determineBaseUrl;
 const types_1 = require("../types");
 const http_client_1 = require("./http-client");
+const git_fallback_1 = require("./git-fallback");
 /**
  * Gitea API client
  */
@@ -40,6 +41,11 @@ class GiteaAPI {
         try {
             const response = await this.client.get(url);
             if (response.statusCode === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,

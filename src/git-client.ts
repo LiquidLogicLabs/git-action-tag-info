@@ -19,12 +19,24 @@ function execGit(command: string, repoPath: string): string {
 }
 
 /**
- * Check if tag exists
+ * Check if tag exists locally
  */
 function tagExists(tagName: string, repoPath: string): boolean {
   try {
     execGit(`rev-parse --verify --quiet refs/tags/${tagName}`, repoPath);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if tag exists on remote
+ */
+function tagExistsOnRemote(tagName: string, remote: string, repoPath: string): boolean {
+  try {
+    const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
+    return output.trim().length > 0;
   } catch {
     return false;
   }

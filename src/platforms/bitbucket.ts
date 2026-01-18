@@ -1,6 +1,7 @@
 import * as https from 'https';
 import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, HttpResponse } from '../types';
 import { Logger } from '../logger';
+import { tryGitLsRemoteFallback } from './git-fallback';
 
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
@@ -113,6 +114,12 @@ export class BitbucketAPI implements PlatformAPI {
       const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
 
       if (response.statusCode === 404) {
+        // Try fallback: check remote tags via git ls-remote if we have a repository URL
+        const fallbackResult = tryGitLsRemoteFallback(tagName, this.repoInfo.url, this.logger);
+        if (fallbackResult) {
+          return fallbackResult;
+        }
+
         return {
           exists: false,
           name: tagName,

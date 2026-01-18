@@ -27604,12 +27604,24 @@ function execGit(command, repoPath) {
     }
 }
 /**
- * Check if tag exists
+ * Check if tag exists locally
  */
 function tagExists(tagName, repoPath) {
     try {
         execGit(`rev-parse --verify --quiet refs/tags/${tagName}`, repoPath);
         return true;
+    }
+    catch {
+        return false;
+    }
+}
+/**
+ * Check if tag exists on remote
+ */
+function tagExistsOnRemote(tagName, remote, repoPath) {
+    try {
+        const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
+        return output.trim().length > 0;
     }
     catch {
         return false;
@@ -27984,6 +27996,7 @@ exports.detectFromUrl = detectFromUrl;
 exports.determineBaseUrl = determineBaseUrl;
 const https = __importStar(__nccwpck_require__(5692));
 const types_1 = __nccwpck_require__(8522);
+const git_fallback_1 = __nccwpck_require__(8715);
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
  */
@@ -28075,6 +28088,11 @@ class BitbucketAPI {
         try {
             const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
             if (response.statusCode === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,
@@ -28312,6 +28330,76 @@ function determineBaseUrl(urls) {
 
 /***/ }),
 
+/***/ 8715:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.tryGitLsRemoteFallback = tryGitLsRemoteFallback;
+const child_process_1 = __nccwpck_require__(5317);
+const types_1 = __nccwpck_require__(8522);
+/**
+ * Try to get tag information using git ls-remote as a fallback when API fails
+ * This is platform-agnostic and works with any git repository
+ *
+ * @param tagName - The tag name to look up
+ * @param repoUrl - The repository URL (will be normalized)
+ * @param logger - Logger instance for debug output
+ * @returns ItemInfo if tag found, null if not found or fallback failed
+ */
+function tryGitLsRemoteFallback(tagName, repoUrl, logger) {
+    if (!repoUrl) {
+        logger.debug('No repository URL available for git ls-remote fallback');
+        return null;
+    }
+    try {
+        logger.debug(`Attempting git ls-remote fallback for tag: ${tagName}`);
+        // Normalize URL - remove .git suffix if present for ls-remote
+        const remoteUrl = repoUrl.replace(/\.git$/, '');
+        const output = (0, child_process_1.execSync)(`git ls-remote --tags ${remoteUrl} refs/tags/${tagName}`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+        if (output.length > 0) {
+            // Tag exists on remote, parse the SHA
+            // Output format: "SHA\trefs/tags/tagName"
+            const sha = output.split(/\s+/)[0];
+            if (sha && sha.length === 40) {
+                // Valid SHA-1 format
+                logger.debug(`Fallback successful: tag ${tagName} found via git ls-remote (SHA: ${sha})`);
+                return {
+                    exists: true,
+                    name: tagName,
+                    item_sha: sha,
+                    item_type: types_1.ItemType.COMMIT,
+                    commit_sha: sha,
+                    details: '',
+                    verified: false,
+                    is_draft: false,
+                    is_prerelease: false,
+                };
+            }
+            else {
+                logger.debug(`Fallback returned invalid SHA format: ${sha}`);
+            }
+        }
+        else {
+            logger.debug(`Fallback returned empty result for tag: ${tagName}`);
+        }
+    }
+    catch (error) {
+        // Fallback failed, log and return null
+        if (error instanceof Error) {
+            logger.debug(`git ls-remote fallback failed: ${error.message}`);
+        }
+        else {
+            logger.debug(`git ls-remote fallback failed: ${String(error)}`);
+        }
+    }
+    return null;
+}
+
+
+/***/ }),
+
 /***/ 4862:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -28324,6 +28412,7 @@ exports.detectFromUrl = detectFromUrl;
 exports.determineBaseUrl = determineBaseUrl;
 const types_1 = __nccwpck_require__(8522);
 const http_client_1 = __nccwpck_require__(3696);
+const git_fallback_1 = __nccwpck_require__(8715);
 /**
  * Gitea API client
  */
@@ -28358,6 +28447,11 @@ class GiteaAPI {
         try {
             const response = await this.client.get(url);
             if (response.statusCode === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,
@@ -28803,6 +28897,7 @@ const rest_1 = __nccwpck_require__(9380);
 const plugin_throttling_1 = __nccwpck_require__(6856);
 const core = __importStar(__nccwpck_require__(7484));
 const types_1 = __nccwpck_require__(8522);
+const git_fallback_1 = __nccwpck_require__(8715);
 // Create Octokit with throttling plugin for automatic rate limit handling
 const ThrottledOctokit = rest_1.Octokit.plugin(plugin_throttling_1.throttling);
 /**
@@ -28904,6 +28999,11 @@ class GitHubAPI {
         catch (error) {
             // Handle 404 errors (tag doesn't exist)
             if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+                // Try fallback: check remote tags via git ls-remote if we have a repository URL
+                const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
                 return {
                     exists: false,
                     name: tagName,

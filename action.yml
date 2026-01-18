@@ -11,6 +11,9 @@ inputs:
   platform:
     description: 'Platform type (github/gitea/bitbucket) for separate input mode'
     required: false
+  repo_type:
+    description: 'Alias for platform (github/gitea/bitbucket). If both platform and repo_type are provided, platform takes precedence.'
+    required: false
   owner:
     description: 'Repository owner (for separate input mode)'
     required: false

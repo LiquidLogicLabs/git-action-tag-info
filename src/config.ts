@@ -54,7 +54,8 @@ export function getInputs(): ActionInputs {
   const tagType = tagTypeInput as 'tags' | 'release';
 
   const repository = getOptionalInput('repository');
-  const platform = getOptionalInput('platform');
+  // Support both 'platform' and 'repo_type' for consistency with other actions
+  const platform = getOptionalInput('platform') || getOptionalInput('repo_type');
   const owner = getOptionalInput('owner');
   const repo = getOptionalInput('repo');
   const baseUrl = getOptionalInput('base_url');

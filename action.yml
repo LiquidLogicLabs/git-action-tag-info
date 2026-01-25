@@ -1,6 +1,6 @@
 name: 'Get Tag Info'
 description: 'Get tag information from local and remote repositories (GitHub, Gitea, Bitbucket)'
-author: ''
+author: 'LiquidLogicLabs'
 inputs:
   tag_name:
     description: 'Tag name or "latest" to get the most recent tag'

@@ -124,7 +124,7 @@ class GitHubAPI {
                     itemType = types_1.ItemType.TAG;
                     verified = tagData.verification?.verified || false;
                 }
-                catch (error) {
+                catch {
                     // If we can't get the tag object, use the ref data
                     // This shouldn't happen, but handle gracefully
                 }
@@ -218,7 +218,7 @@ class GitHubAPI {
                     commitSha = itemSha;
                 }
             }
-            catch (error) {
+            catch {
                 // If we can't get the tag ref, leave SHAs empty
             }
             return {

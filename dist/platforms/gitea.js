@@ -160,7 +160,7 @@ class GiteaAPI {
                     }
                 }
             }
-            catch (error) {
+            catch {
                 // If we can't get the tag ref, leave SHAs empty
             }
             return {

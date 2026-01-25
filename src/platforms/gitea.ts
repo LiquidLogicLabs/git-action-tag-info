@@ -180,7 +180,7 @@ export class GiteaAPI implements PlatformAPI {
             commitSha = itemSha;
           }
         }
-      } catch (error) {
+      } catch {
         // If we can't get the tag ref, leave SHAs empty
       }
 

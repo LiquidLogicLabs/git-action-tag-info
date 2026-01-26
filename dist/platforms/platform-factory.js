@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPlatformAPI = createPlatformAPI;
 const exec = __importStar(require("@actions/exec"));
 const types_1 = require("../types");
+const git_platform_detector_1 = require("git-platform-detector");
 const github_1 = require("./github");
 const gitea_1 = require("./gitea");
 const bitbucket_1 = require("./bitbucket");
@@ -43,20 +44,14 @@ const local_1 = require("./local");
 const platformProviders = [
     {
         type: types_1.Platform.GITEA,
-        detectFromUrlByHostname: gitea_1.detectFromUrlByHostname,
-        detectFromUrl: gitea_1.detectFromUrl,
         createAPI: (repoInfo, config, logger) => new gitea_1.GiteaAPI(repoInfo, config, logger)
     },
     {
         type: types_1.Platform.GITHUB,
-        detectFromUrlByHostname: github_1.detectFromUrlByHostname,
-        detectFromUrl: github_1.detectFromUrl,
         createAPI: (repoInfo, config, logger) => new github_1.GitHubAPI(repoInfo, config, logger)
     },
     {
         type: types_1.Platform.BITBUCKET,
-        detectFromUrlByHostname: bitbucket_1.detectFromUrlByHostname,
-        detectFromUrl: bitbucket_1.detectFromUrl,
         createAPI: (repoInfo, config, logger) => new bitbucket_1.BitbucketAPI(repoInfo, config, logger)
     }
 ];
@@ -104,13 +99,15 @@ async function collectCandidateUrls(repoInfo, logger) {
     }
     return urls;
 }
-async function resolvePlatform(repoInfo, explicitPlatform, logger) {
+async function resolvePlatform(repoInfo, explicitPlatform, logger, token) {
     // If explicit platform is provided and not 'auto', use it
     if (explicitPlatform && explicitPlatform !== 'auto') {
+        (0, git_platform_detector_1.createByName)(explicitPlatform, { providers: (0, git_platform_detector_1.getBuiltInProviders)() });
         return explicitPlatform;
     }
     // If repoInfo has explicit platform (not 'auto'), use it
     if (repoInfo.platform && repoInfo.platform !== 'auto') {
+        (0, git_platform_detector_1.createByName)(repoInfo.platform, { providers: (0, git_platform_detector_1.getBuiltInProviders)() });
         return repoInfo.platform;
     }
     // If we have a local path, we can't detect platform from URL
@@ -123,39 +120,20 @@ async function resolvePlatform(repoInfo, explicitPlatform, logger) {
     }
     // Collect candidate URLs
     const candidateUrls = await collectCandidateUrls(repoInfo, logger);
-    // First loop: Try detectFromUrlByHostname on each URL
-    for (const urlStr of candidateUrls) {
-        try {
-            const url = new URL(urlStr);
-            // Try detectFromUrlByHostname from each provider
-            for (const provider of platformProviders) {
-                const detected = provider.detectFromUrlByHostname(url);
-                if (detected) {
-                    logger.debug(`Detected platform ${detected} from hostname: ${url.hostname} (URL: ${urlStr})`);
-                    return detected;
-                }
-            }
-        }
-        catch {
-            logger.debug(`Could not parse URL for hostname detection: ${urlStr}`);
-        }
+    const detection = await (0, git_platform_detector_1.detectPlatform)({
+        providers: (0, git_platform_detector_1.getBuiltInProviders)(),
+        extraUrls: candidateUrls,
+        env: {},
+        credentials: token ? { token } : undefined
+    });
+    if (detection.providerId === 'github') {
+        return types_1.Platform.GITHUB;
     }
-    // Second loop: Try detectFromUrl (endpoint probing) on each URL
-    for (const urlStr of candidateUrls) {
-        try {
-            const url = new URL(urlStr);
-            // Try detectFromUrl from each provider
-            for (const provider of platformProviders) {
-                const detected = await provider.detectFromUrl(url, logger);
-                if (detected) {
-                    logger.debug(`Detected platform ${detected} from API probe: ${urlStr}`);
-                    return detected;
-                }
-            }
-        }
-        catch {
-            logger.debug(`Could not parse URL for detector probes: ${urlStr}`);
-        }
+    if (detection.providerId === 'gitea') {
+        return types_1.Platform.GITEA;
+    }
+    if (detection.providerId === 'bitbucket') {
+        return types_1.Platform.BITBUCKET;
     }
     // Default to GitHub if we have owner/repo but couldn't detect
     if (repoInfo.owner && repoInfo.repo) {
@@ -180,7 +158,7 @@ async function createPlatformAPI(repoInfo, explicitPlatform, config, logger) {
         const api = new local_1.LocalGitAPI(repoInfo, platformConfig, logger);
         return { platform: types_1.Platform.GITHUB, api }; // Platform is placeholder for local
     }
-    const platform = await resolvePlatform(repoInfo, explicitPlatform, logger);
+    const platform = await resolvePlatform(repoInfo, explicitPlatform, logger, config.token);
     // Find the provider for the resolved platform
     const provider = platformProviders.find(p => p.type === platform);
     if (!provider) {

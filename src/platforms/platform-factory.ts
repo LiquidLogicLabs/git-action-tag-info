@@ -1,35 +1,28 @@
 import * as exec from '@actions/exec';
 import { Platform, RepositoryInfo, PlatformAPI, PlatformConfig } from '../types';
 import { Logger } from '../logger';
-import { GitHubAPI, detectFromUrlByHostname as detectGithubFromUrlByHostname, detectFromUrl as detectGithubFromUrl, determineBaseUrl as determineGithubBaseUrl } from './github';
-import { GiteaAPI, detectFromUrlByHostname as detectGiteaFromUrlByHostname, detectFromUrl as detectGiteaFromUrl, determineBaseUrl as determineGiteaBaseUrl } from './gitea';
-import { BitbucketAPI, detectFromUrlByHostname as detectBitbucketFromUrlByHostname, detectFromUrl as detectBitbucketFromUrl, determineBaseUrl as determineBitbucketBaseUrl } from './bitbucket';
+import { createByName, detectPlatform, getBuiltInProviders } from 'git-platform-detector';
+import { GitHubAPI, determineBaseUrl as determineGithubBaseUrl } from './github';
+import { GiteaAPI, determineBaseUrl as determineGiteaBaseUrl } from './gitea';
+import { BitbucketAPI, determineBaseUrl as determineBitbucketBaseUrl } from './bitbucket';
 import { LocalGitAPI } from './local';
 
 interface PlatformProvider {
   type: Platform;
-  detectFromUrlByHostname: (url: URL) => Platform | undefined;
-  detectFromUrl: (url: URL, logger: Logger) => Promise<Platform | undefined>;
   createAPI: (repoInfo: RepositoryInfo, config: PlatformConfig, logger: Logger) => PlatformAPI;
 }
 
 const platformProviders: PlatformProvider[] = [
   {
     type: Platform.GITEA,
-    detectFromUrlByHostname: detectGiteaFromUrlByHostname,
-    detectFromUrl: detectGiteaFromUrl,
     createAPI: (repoInfo, config, logger) => new GiteaAPI(repoInfo, config, logger)
   },
   {
     type: Platform.GITHUB,
-    detectFromUrlByHostname: detectGithubFromUrlByHostname,
-    detectFromUrl: detectGithubFromUrl,
     createAPI: (repoInfo, config, logger) => new GitHubAPI(repoInfo, config, logger)
   },
   {
     type: Platform.BITBUCKET,
-    detectFromUrlByHostname: detectBitbucketFromUrlByHostname,
-    detectFromUrl: detectBitbucketFromUrl,
     createAPI: (repoInfo, config, logger) => new BitbucketAPI(repoInfo, config, logger)
   }
 ];
@@ -86,15 +79,18 @@ async function collectCandidateUrls(repoInfo: RepositoryInfo, logger: Logger): P
 async function resolvePlatform(
   repoInfo: RepositoryInfo,
   explicitPlatform: Platform | 'auto' | undefined,
-  logger: Logger
+  logger: Logger,
+  token?: string
 ): Promise<Platform> {
   // If explicit platform is provided and not 'auto', use it
   if (explicitPlatform && explicitPlatform !== 'auto') {
+    createByName(explicitPlatform, { providers: getBuiltInProviders() });
     return explicitPlatform;
   }
 
   // If repoInfo has explicit platform (not 'auto'), use it
   if (repoInfo.platform && repoInfo.platform !== 'auto') {
+    createByName(repoInfo.platform, { providers: getBuiltInProviders() });
     return repoInfo.platform;
   }
 
@@ -110,39 +106,21 @@ async function resolvePlatform(
   // Collect candidate URLs
   const candidateUrls = await collectCandidateUrls(repoInfo, logger);
 
-  // First loop: Try detectFromUrlByHostname on each URL
-  for (const urlStr of candidateUrls) {
-    try {
-      const url = new URL(urlStr);
+  const detection = await detectPlatform({
+    providers: getBuiltInProviders(),
+    extraUrls: candidateUrls,
+    env: {},
+    credentials: token ? { token } : undefined
+  });
 
-      // Try detectFromUrlByHostname from each provider
-      for (const provider of platformProviders) {
-        const detected = provider.detectFromUrlByHostname(url);
-        if (detected) {
-          logger.debug(`Detected platform ${detected} from hostname: ${url.hostname} (URL: ${urlStr})`);
-          return detected;
-        }
-      }
-    } catch {
-      logger.debug(`Could not parse URL for hostname detection: ${urlStr}`);
-    }
+  if (detection.providerId === 'github') {
+    return Platform.GITHUB;
   }
-
-  // Second loop: Try detectFromUrl (endpoint probing) on each URL
-  for (const urlStr of candidateUrls) {
-    try {
-      const url = new URL(urlStr);
-      // Try detectFromUrl from each provider
-      for (const provider of platformProviders) {
-        const detected = await provider.detectFromUrl(url, logger);
-        if (detected) {
-          logger.debug(`Detected platform ${detected} from API probe: ${urlStr}`);
-          return detected;
-        }
-      }
-    } catch {
-      logger.debug(`Could not parse URL for detector probes: ${urlStr}`);
-    }
+  if (detection.providerId === 'gitea') {
+    return Platform.GITEA;
+  }
+  if (detection.providerId === 'bitbucket') {
+    return Platform.BITBUCKET;
   }
 
   // Default to GitHub if we have owner/repo but couldn't detect
@@ -181,7 +159,7 @@ export async function createPlatformAPI(
     return { platform: Platform.GITHUB, api }; // Platform is placeholder for local
   }
 
-  const platform = await resolvePlatform(repoInfo, explicitPlatform, logger);
+  const platform = await resolvePlatform(repoInfo, explicitPlatform, logger, config.token);
 
   // Find the provider for the resolved platform
   const provider = platformProviders.find(p => p.type === platform);

@@ -35,7 +35,7 @@
     "@actions/core": "^1.11.1",
     "@octokit/plugin-throttling": "^11.0.3",
     "@octokit/rest": "^22.0.1",
-    "git-platform-detector": "file:../npm-package-git-platfom-detector"
+    "git-platform-detector": "https://git.ravenwolf.org/api/packages/liquidlogiclabs/npm/git-platform-detector/-/git-platform-detector-1.1.0.tgz"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",

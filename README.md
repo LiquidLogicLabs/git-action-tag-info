@@ -23,7 +23,7 @@ Get tag and release information from local and remote repositories (GitHub, Gite
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: ./my-repo
@@ -34,7 +34,7 @@ Get tag and release information from local and remote repositories (GitHub, Gite
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: https://github.com/owner/repo
@@ -46,7 +46,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: https://github.com/owner/repo
@@ -58,7 +58,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     platform: github
@@ -72,7 +72,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: https://gitea.example.com/owner/repo
@@ -85,7 +85,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info from self-hosted instance
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://git.example.com/owner/repo
@@ -99,7 +99,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: https://bitbucket.org/owner/repo
@@ -111,7 +111,7 @@ Or with a custom token:
 ```yaml
 - name: Get latest tag
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
@@ -128,7 +128,7 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
 ```yaml
 - name: Get latest version tag
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/linuxserver/docker-baseimage-alpine
@@ -163,42 +163,42 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
 
 ```yaml
 # Match tags with format X.X (e.g., 3.23, 1.2)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: X.X
 
 # Match tags with format X.X.X (e.g., 1.2.3, 10.5.0)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: X.X.X
 
 # Match tags with v prefix (e.g., v1.2.3)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: vX.X.X
 
 # Match tags with wildcard pattern *.* (e.g., 3.23, abc.def)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: '*.*'  # Matches any two segments separated by a dot
 
 # Match tags with wildcard pattern *.*.* (e.g., 1.2.3, abc.def.ghi)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: '*.*.*'  # Matches any three segments separated by dots
 
 # Use regex for advanced patterns
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
@@ -218,28 +218,28 @@ You can provide multiple format patterns as fallbacks. Patterns are tried in ord
 
 ```yaml
 # Try 3-segment tags first (e.g., 3.19.5), fallback to 2-segment (e.g., 3.19)
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: '["*.*.*", "*.*"]'  # JSON array string format
 
 # Same as above, using comma-separated format
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: "*.*.*,*.*"  # Comma-separated format
 
 # Try numeric 3-segment, then 2-segment, then any 2-segment
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
     tag_format: '["X.X.X", "X.X", "*.*"]'
 
 # Try v-prefixed tags, then any tags
-- uses: your-org/git-tag-info-action@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://github.com/owner/repo
@@ -267,10 +267,10 @@ This action supports flexible version pinning to balance stability and updates:
 - Recommended when you want to stay on a specific minor version
 - Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.0`
 
-**Exact Version** (`@v1.0.3`):
+**Exact Version** (e.g. `@v1.2.3`):
 - Pins to a specific release
 - Recommended for production workflows requiring maximum stability
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.0.3`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.2.3` (pick a tag from Releases)
 
 > **Note**: Major and minor version tags (e.g., `v1`, `v1.0`) are automatically created/updated with each stable release to point to the latest patch version.
 
@@ -281,7 +281,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get release info
   id: release-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     tag_type: release
@@ -301,7 +301,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get latest release
   id: release-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     tag_type: release
@@ -317,7 +317,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: v1.0.0
     repository: https://github.com/owner/repo
@@ -545,7 +545,7 @@ For self-hosted instances (especially Gitea) that use self-signed SSL certificat
 
 ```yaml
 - name: Get tag from self-hosted instance
-  uses: your-org/git-tag-info-action@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tag_name: latest
     repository: https://git.example.com/owner/repo

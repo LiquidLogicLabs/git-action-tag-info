@@ -27999,7 +27999,10 @@ function getInputs() {
     const ignoreCertErrors = getBooleanInput('ignore_cert_errors', false);
     const tagFormatInput = getOptionalInput('tag_format');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
-    const verbose = getBooleanInput('verbose', false);
+    const verboseInput = getBooleanInput('verbose', false);
+    const envStepDebug = (process.env.ACTIONS_STEP_DEBUG || '').toLowerCase();
+    const stepDebugEnabled = core.isDebug() || envStepDebug === 'true' || envStepDebug === '1';
+    const verbose = verboseInput || stepDebugEnabled;
     // Validate base URL format if provided
     if (baseUrl) {
         try {

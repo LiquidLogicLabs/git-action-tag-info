@@ -56,7 +56,7 @@ jobs:
         run: |
           test "${{ steps.github-url.outputs.exists }}" = "true"
           test -n "${{ steps.github-url.outputs.name }}"
-          test -n "${{ steps.github-url.outputs.item_sha }}"
+          test -n "${{ steps.github-url.outputs.itemSha }}"
 
       - name: Action e2e - GitHub separate inputs
         id: github-separate

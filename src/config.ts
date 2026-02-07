@@ -42,26 +42,25 @@ function getOptionalInput(name: string): string | undefined {
  * Get and validate action inputs
  */
 export function getInputs(): ActionInputs {
-  const tagName = core.getInput('tag_name', { required: true });
+  const tagName = core.getInput('tagName', { required: true });
   if (!tagName || tagName.trim() === '') {
-    throw new Error('tag_name is required and cannot be empty');
+    throw new Error('tagName is required and cannot be empty');
   }
 
-  const tagTypeInput = core.getInput('tag_type') || 'tags';
+  const tagTypeInput = core.getInput('tagType') || 'tags';
   if (tagTypeInput !== 'tags' && tagTypeInput !== 'release') {
-    throw new Error(`Invalid tag_type: ${tagTypeInput}. Must be 'tags' or 'release'`);
+    throw new Error(`Invalid tagType: ${tagTypeInput}. Must be 'tags' or 'release'`);
   }
   const tagType = tagTypeInput as 'tags' | 'release';
 
   const repository = getOptionalInput('repository');
-  // Support both 'platform' and 'repo_type' for consistency with other actions
-  const platform = getOptionalInput('platform') || getOptionalInput('repo_type');
+  const platform = getOptionalInput('platform') || getOptionalInput('repoType');
   const owner = getOptionalInput('owner');
   const repo = getOptionalInput('repo');
-  const baseUrl = getOptionalInput('base_url');
+  const baseUrl = getOptionalInput('baseUrl');
   const token = getOptionalInput('token');
-  const ignoreCertErrors = getBooleanInput('ignore_cert_errors', false);
-  const tagFormatInput = getOptionalInput('tag_format');
+  const ignoreCertErrors = getBooleanInput('skipCertificateCheck', false);
+  const tagFormatInput = getOptionalInput('tagFormat');
   const tagFormat = parseTagFormat(tagFormatInput);
   const verboseInput = getBooleanInput('verbose', false);
   const envStepDebug = (process.env.ACTIONS_STEP_DEBUG || '').toLowerCase();
@@ -73,7 +72,7 @@ export function getInputs(): ActionInputs {
     try {
       new URL(baseUrl);
     } catch {
-      throw new Error(`Invalid base_url format: ${baseUrl}`);
+      throw new Error(`Invalid baseUrl format: ${baseUrl}`);
     }
   }
 

@@ -75,15 +75,15 @@ async function run(): Promise<void> {
     // Set outputs with normalized field names
     core.setOutput('exists', itemInfo.exists.toString());
     core.setOutput('name', itemInfo.name);
-    core.setOutput('item_sha', itemInfo.item_sha);
-    core.setOutput('item_sha_short', shortSha(itemInfo.item_sha));
-    core.setOutput('item_type', itemInfo.item_type);
-    core.setOutput('commit_sha', itemInfo.commit_sha);
-    core.setOutput('commit_sha_short', shortSha(itemInfo.commit_sha));
+    core.setOutput('itemSha', itemInfo.item_sha);
+    core.setOutput('itemShaShort', shortSha(itemInfo.item_sha));
+    core.setOutput('itemType', itemInfo.item_type);
+    core.setOutput('commitSha', itemInfo.commit_sha);
+    core.setOutput('commitShaShort', shortSha(itemInfo.commit_sha));
     core.setOutput('details', itemInfo.details);
     core.setOutput('verified', itemInfo.verified.toString());
-    core.setOutput('is_draft', itemInfo.is_draft.toString());
-    core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
+    core.setOutput('isDraft', itemInfo.is_draft.toString());
+    core.setOutput('isPrerelease', itemInfo.is_prerelease.toString());
 
     if (!itemInfo.exists) {
       logger.warning(
@@ -93,19 +93,19 @@ async function run(): Promise<void> {
       logger.info(
         `${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`
       );
-      logger.debug(`Name: ${itemInfo.name}`);
-      logger.debug(`SHA: ${itemInfo.item_sha}`);
-      logger.debug(`Type: ${itemInfo.item_type}`);
-      logger.debug(`Commit: ${itemInfo.commit_sha}`);
+      logger.debug(`name: ${itemInfo.name}`);
+      logger.debug(`itemSha: ${itemInfo.item_sha}`);
+      logger.debug(`itemType: ${itemInfo.item_type}`);
+      logger.debug(`commitSha: ${itemInfo.commit_sha}`);
       if (itemInfo.details) {
-        logger.debug(`Details: ${itemInfo.details.substring(0, 100)}...`);
+        logger.debug(`details: ${itemInfo.details.substring(0, 100)}...`);
       }
       if (inputs.tagType === 'release') {
-        logger.debug(`Draft: ${itemInfo.is_draft}`);
-        logger.debug(`Prerelease: ${itemInfo.is_prerelease}`);
+        logger.debug(`isDraft: ${itemInfo.is_draft}`);
+        logger.debug(`isPrerelease: ${itemInfo.is_prerelease}`);
       }
       if (inputs.tagType === 'tags' && itemInfo.verified) {
-        logger.debug(`Verified: ${itemInfo.verified}`);
+        logger.debug(`verified: ${itemInfo.verified}`);
       }
     }
   } catch (error) {

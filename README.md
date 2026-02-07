@@ -132,7 +132,7 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
   with:
     tagName: latest
     repository: https://github.com/linuxserver/docker-baseimage-alpine
-    tag_format: X.X  # Finds latest tag like "3.23" instead of "edge-e9613ab3-ls213"
+    tagFormat: X.X  # Finds latest tag like "3.23" instead of "edge-e9613ab3-ls213"
 
 - name: Use latest version tag
   run: echo "Latest version tag is ${{ steps.tag-info.outputs.name }}"
@@ -167,42 +167,42 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: X.X
+    tagFormat: X.X
 
 # Match tags with format X.X.X (e.g., 1.2.3, 10.5.0)
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: X.X.X
+    tagFormat: X.X.X
 
 # Match tags with v prefix (e.g., v1.2.3)
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: vX.X.X
+    tagFormat: vX.X.X
 
 # Match tags with wildcard pattern *.* (e.g., 3.23, abc.def)
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '*.*'  # Matches any two segments separated by a dot
+    tagFormat: '*.*'  # Matches any two segments separated by a dot
 
 # Match tags with wildcard pattern *.*.* (e.g., 1.2.3, abc.def.ghi)
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '*.*.*'  # Matches any three segments separated by dots
+    tagFormat: '*.*.*'  # Matches any three segments separated by dots
 
 # Use regex for advanced patterns
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '^v\\d+\\.\\d+\\.\\d+$'  # Matches v1.2.3, v10.5.0, etc.
+    tagFormat: '^v\\d+\\.\\d+\\.\\d+$'  # Matches v1.2.3, v10.5.0, etc.
 ```
 
 ### Array Support with Fallback Patterns
@@ -222,28 +222,28 @@ You can provide multiple format patterns as fallbacks. Patterns are tried in ord
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '["*.*.*", "*.*"]'  # JSON array string format
+    tagFormat: '["*.*.*", "*.*"]'  # JSON array string format
 
 # Same as above, using comma-separated format
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: "*.*.*,*.*"  # Comma-separated format
+    tagFormat: "*.*.*,*.*"  # Comma-separated format
 
 # Try numeric 3-segment, then 2-segment, then any 2-segment
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '["X.X.X", "X.X", "*.*"]'
+    tagFormat: '["X.X.X", "X.X", "*.*"]'
 
 # Try v-prefixed tags, then any tags
 - uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
     repository: https://github.com/owner/repo
-    tag_format: '["v*.*.*", "*.*.*", "*.*"]'
+    tagFormat: '["v*.*.*", "*.*.*", "*.*"]'
 ```
 
 **Fallback Behavior:**
@@ -284,16 +284,16 @@ Query releases from remote repositories. Releases are not supported for local re
   uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: v1.0.0
-    tag_type: release
+    tagType: release
     repository: https://github.com/owner/repo
     token: ${{ secrets.GITHUB_TOKEN }}
 
 - name: Display release info
   run: |
     echo "Release: ${{ steps.release-info.outputs.name }}"
-    echo "SHA: ${{ steps.release-info.outputs.item_sha }}"
-    echo "Draft: ${{ steps.release-info.outputs.is_draft }}"
-    echo "Prerelease: ${{ steps.release-info.outputs.is_prerelease }}"
+    echo "SHA: ${{ steps.release-info.outputs.itemSha }}"
+    echo "Draft: ${{ steps.release-info.outputs.isDraft }}"
+    echo "Prerelease: ${{ steps.release-info.outputs.isPrerelease }}"
 ```
 
 ### Get Latest Release
@@ -304,7 +304,7 @@ Query releases from remote repositories. Releases are not supported for local re
   uses: LiquidLogicLabs/git-action-tag-info@v1
   with:
     tagName: latest
-    tag_type: release
+    tagType: release
     repository: https://github.com/owner/repo
     token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -329,9 +329,9 @@ Query releases from remote repositories. Releases are not supported for local re
 - name: Display tag info
   run: |
     echo "Name: ${{ steps.tag-info.outputs.name }}"
-    echo "SHA: ${{ steps.tag-info.outputs.item_sha }}"
-    echo "Commit: ${{ steps.tag-info.outputs.commit_sha }}"
-    echo "Type: ${{ steps.tag-info.outputs.item_type }}"
+    echo "SHA: ${{ steps.tag-info.outputs.itemSha }}"
+    echo "Commit: ${{ steps.tag-info.outputs.commitSha }}"
+    echo "Type: ${{ steps.tag-info.outputs.itemType }}"
     echo "Details: ${{ steps.tag-info.outputs.details }}"
 ```
 
@@ -347,8 +347,8 @@ Query releases from remote repositories. Releases are not supported for local re
 | `baseUrl` | Custom base URL for self-hosted instances (e.g., https://gitea.example.com) | No | - |
 | `token` | Custom Personal Access Token (works for all platforms). If not provided, automatically falls back to `GITHUB_TOKEN` environment variable when available (e.g., in GitHub Actions) | No | - |
 | `skipCertificateCheck` | Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). **Warning**: This is a security risk and should only be used with trusted self-hosted instances | No | `false` |
-| `tag_type` | Type of item to fetch: `"tags"` (git tags) or `"release"` (platform releases). Releases are only supported for remote repositories (not local). Default: `"tags"` | No | `tags` |
-| `tag_format` | Format pattern(s) to filter tags/releases when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no items, second pattern is tried, etc. Only items matching the first successful format pattern will be considered when resolving "latest" | No | - |
+| `tagType` | Type of item to fetch: `"tags"` (git tags) or `"release"` (platform releases). Releases are only supported for remote repositories (not local). Default: `"tags"` | No | `tags` |
+| `tagFormat` | Format pattern(s) to filter tags/releases when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no items, second pattern is tried, etc. Only items matching the first successful format pattern will be considered when resolving "latest" | No | - |
 | `verbose` | Enable verbose debug logging (prints `[DEBUG] ...` messages) | No | `false` |
 
 ## Outputs
@@ -357,15 +357,15 @@ Query releases from remote repositories. Releases are not supported for local re
 |------|-------------|
 | `exists` | Boolean indicating if item exists |
 | `name` | Item name (tag name for tags/releases) |
-| `item_sha` | Item SHA (tag SHA for tags/releases) |
-| `item_sha_short` | Short item SHA (first 7 characters) |
-| `item_type` | Item type (commit/tag/release) |
-| `commit_sha` | Commit SHA |
-| `commit_sha_short` | Short commit SHA (first 7 characters) |
+| `itemSha` | Item SHA (tag SHA for tags/releases) |
+| `itemShaShort` | Short item SHA (first 7 characters) |
+| `itemType` | Item type (commit/tag/release) |
+| `commitSha` | Commit SHA |
+| `commitShaShort` | Short commit SHA (first 7 characters) |
 | `details` | Item details (tag message or release body) |
 | `verified` | Whether item is verified (tags only, false for releases) |
-| `is_draft` | Whether release is a draft (releases only, false for tags) |
-| `is_prerelease` | Whether release is a prerelease (releases only, false for tags) |
+| `isDraft` | Whether release is a draft (releases only, false for tags) |
+| `isPrerelease` | Whether release is a prerelease (releases only, false for tags) |
 
 ## Workflow Examples
 
@@ -445,7 +445,7 @@ jobs:
       - name: Use tag info
         run: |
           echo "Tag: ${{ steps.tag-info.outputs.name }}"
-          echo "SHA: ${{ steps.tag-info.outputs.item_sha }}"
+          echo "SHA: ${{ steps.tag-info.outputs.itemSha }}"
 ```
 
 ### Complete Workflow with Multiple Token Scenarios
@@ -499,15 +499,15 @@ jobs:
 
 When `tagName` is set to `"latest"`, the action uses the following strategy:
 
-1. **Format Filtering** (if `tag_format` is provided): Filter tags/releases to only those matching the specified format pattern(s)
-   - If `tag_format` is an array, patterns are tried in order as fallbacks
+1. **Format Filtering** (if `tagFormat` is provided): Filter tags/releases to only those matching the specified format pattern(s)
+   - If `tagFormat` is an array, patterns are tried in order as fallbacks
    - First pattern that matches at least one item is used
    - If no patterns match any items, the action fails with a clear error message
 2. **Semver First**: If semantic version tags/releases exist (e.g., v1.2.3, 1.0.0), it selects the highest version
 3. **Date Fallback**: If no semver items exist, it selects the most recent item by creation/published date
 4. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
 
-**Note**: Format filtering happens before sorting, so only items matching the format are considered. If `tag_format` is an array and no patterns match any items, the action will fail with a clear error message listing all attempted patterns. For releases, the date used is the release published date.
+**Note**: Format filtering happens before sorting, so only items matching the format are considered. If `tagFormat` is an array and no patterns match any items, the action will fail with a clear error message listing all attempted patterns. For releases, the date used is the release published date.
 
 ## Repository Detection
 
@@ -522,7 +522,7 @@ Examples:
 - `/absolute/path/to/repo` → Local
 - `git@github.com:owner/repo.git` → Remote (GitHub)
 
-**Important**: Releases are only supported for remote repositories. If you set `tag_type: release` with a local repository, the action will throw an error.
+**Important**: Releases are only supported for remote repositories. If you set `tagType: release` with a local repository, the action will throw an error.
 
 ## Authentication
 

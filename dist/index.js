@@ -27980,24 +27980,23 @@ function getOptionalInput(name) {
  * Get and validate action inputs
  */
 function getInputs() {
-    const tagName = core.getInput('tag_name', { required: true });
+    const tagName = core.getInput('tagName', { required: true });
     if (!tagName || tagName.trim() === '') {
-        throw new Error('tag_name is required and cannot be empty');
+        throw new Error('tagName is required and cannot be empty');
     }
-    const tagTypeInput = core.getInput('tag_type') || 'tags';
+    const tagTypeInput = core.getInput('tagType') || 'tags';
     if (tagTypeInput !== 'tags' && tagTypeInput !== 'release') {
-        throw new Error(`Invalid tag_type: ${tagTypeInput}. Must be 'tags' or 'release'`);
+        throw new Error(`Invalid tagType: ${tagTypeInput}. Must be 'tags' or 'release'`);
     }
     const tagType = tagTypeInput;
     const repository = getOptionalInput('repository');
-    // Support both 'platform' and 'repo_type' for consistency with other actions
-    const platform = getOptionalInput('platform') || getOptionalInput('repo_type');
+    const platform = getOptionalInput('platform') || getOptionalInput('repoType');
     const owner = getOptionalInput('owner');
     const repo = getOptionalInput('repo');
-    const baseUrl = getOptionalInput('base_url');
+    const baseUrl = getOptionalInput('baseUrl');
     const token = getOptionalInput('token');
-    const ignoreCertErrors = getBooleanInput('ignore_cert_errors', false);
-    const tagFormatInput = getOptionalInput('tag_format');
+    const ignoreCertErrors = getBooleanInput('skipCertificateCheck', false);
+    const tagFormatInput = getOptionalInput('tagFormat');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
     const verboseInput = getBooleanInput('verbose', false);
     const envStepDebug = (process.env.ACTIONS_STEP_DEBUG || '').toLowerCase();
@@ -28009,7 +28008,7 @@ function getInputs() {
             new URL(baseUrl);
         }
         catch {
-            throw new Error(`Invalid base_url format: ${baseUrl}`);
+            throw new Error(`Invalid baseUrl format: ${baseUrl}`);
         }
     }
     return {
@@ -28574,33 +28573,33 @@ async function run() {
         // Set outputs with normalized field names
         core.setOutput('exists', itemInfo.exists.toString());
         core.setOutput('name', itemInfo.name);
-        core.setOutput('item_sha', itemInfo.item_sha);
-        core.setOutput('item_sha_short', shortSha(itemInfo.item_sha));
-        core.setOutput('item_type', itemInfo.item_type);
-        core.setOutput('commit_sha', itemInfo.commit_sha);
-        core.setOutput('commit_sha_short', shortSha(itemInfo.commit_sha));
+        core.setOutput('itemSha', itemInfo.item_sha);
+        core.setOutput('itemShaShort', shortSha(itemInfo.item_sha));
+        core.setOutput('itemType', itemInfo.item_type);
+        core.setOutput('commitSha', itemInfo.commit_sha);
+        core.setOutput('commitShaShort', shortSha(itemInfo.commit_sha));
         core.setOutput('details', itemInfo.details);
         core.setOutput('verified', itemInfo.verified.toString());
-        core.setOutput('is_draft', itemInfo.is_draft.toString());
-        core.setOutput('is_prerelease', itemInfo.is_prerelease.toString());
+        core.setOutput('isDraft', itemInfo.is_draft.toString());
+        core.setOutput('isPrerelease', itemInfo.is_prerelease.toString());
         if (!itemInfo.exists) {
             logger.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
         }
         else {
             logger.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
-            logger.debug(`Name: ${itemInfo.name}`);
-            logger.debug(`SHA: ${itemInfo.item_sha}`);
-            logger.debug(`Type: ${itemInfo.item_type}`);
-            logger.debug(`Commit: ${itemInfo.commit_sha}`);
+            logger.debug(`name: ${itemInfo.name}`);
+            logger.debug(`itemSha: ${itemInfo.item_sha}`);
+            logger.debug(`itemType: ${itemInfo.item_type}`);
+            logger.debug(`commitSha: ${itemInfo.commit_sha}`);
             if (itemInfo.details) {
-                logger.debug(`Details: ${itemInfo.details.substring(0, 100)}...`);
+                logger.debug(`details: ${itemInfo.details.substring(0, 100)}...`);
             }
             if (inputs.tagType === 'release') {
-                logger.debug(`Draft: ${itemInfo.is_draft}`);
-                logger.debug(`Prerelease: ${itemInfo.is_prerelease}`);
+                logger.debug(`isDraft: ${itemInfo.is_draft}`);
+                logger.debug(`isPrerelease: ${itemInfo.is_prerelease}`);
             }
             if (inputs.tagType === 'tags' && itemInfo.verified) {
-                logger.debug(`Verified: ${itemInfo.verified}`);
+                logger.debug(`verified: ${itemInfo.verified}`);
             }
         }
     }

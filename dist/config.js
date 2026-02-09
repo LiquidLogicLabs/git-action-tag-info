@@ -59,28 +59,33 @@ function getOptionalInput(name) {
  * Get and validate action inputs
  */
 function getInputs() {
-    const tagName = core.getInput('tagName', { required: true });
+    const tagName = core.getInput('tag-name', { required: true });
     if (!tagName || tagName.trim() === '') {
-        throw new Error('tagName is required and cannot be empty');
+        throw new Error('tag-name is required and cannot be empty');
     }
-    const tagTypeInput = core.getInput('tagType') || 'tags';
+    const tagTypeInput = core.getInput('tag-type') || 'tags';
     if (tagTypeInput !== 'tags' && tagTypeInput !== 'release') {
         throw new Error(`Invalid tagType: ${tagTypeInput}. Must be 'tags' or 'release'`);
     }
     const tagType = tagTypeInput;
     const repository = getOptionalInput('repository');
-    const platform = getOptionalInput('platform') || getOptionalInput('repoType');
+    const platform = getOptionalInput('platform') || getOptionalInput('repo-type');
     const owner = getOptionalInput('owner');
     const repo = getOptionalInput('repo');
-    const baseUrl = getOptionalInput('baseUrl');
+    const baseUrl = getOptionalInput('base-url');
     const token = getOptionalInput('token');
-    const ignoreCertErrors = getBooleanInput('skipCertificateCheck', false);
-    const tagFormatInput = getOptionalInput('tagFormat');
+    const ignoreCertErrors = getBooleanInput('skip-certificate-check', false);
+    const tagFormatInput = getOptionalInput('tag-format');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
     const verboseInput = getBooleanInput('verbose', false);
-    const envStepDebug = (process.env.ACTIONS_STEP_DEBUG || '').toLowerCase();
-    const stepDebugEnabled = core.isDebug() || envStepDebug === 'true' || envStepDebug === '1';
-    const verbose = verboseInput || stepDebugEnabled;
+    function parseBoolean(val) {
+        return val?.toLowerCase() === 'true' || val === '1';
+    }
+    const debugMode = (typeof core.isDebug === 'function' && core.isDebug()) ||
+        parseBoolean(process.env.ACTIONS_STEP_DEBUG) ||
+        parseBoolean(process.env.ACTIONS_RUNNER_DEBUG) ||
+        parseBoolean(process.env.RUNNER_DEBUG);
+    const verbose = verboseInput || debugMode;
     // Validate base URL format if provided
     if (baseUrl) {
         try {
@@ -102,6 +107,7 @@ function getInputs() {
         ignoreCertErrors,
         tagFormat,
         verbose,
+        debugMode,
     };
 }
 /**

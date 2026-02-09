@@ -2,7 +2,7 @@ name: 'Get Tag Info'
 description: 'Get tag information from local and remote repositories (GitHub, Gitea, Bitbucket)'
 author: 'LiquidLogicLabs'
 inputs:
-  tagName:
+  tag-name:
     description: 'Tag name or "latest" to get the most recent tag'
     required: true
   repository:
@@ -11,7 +11,7 @@ inputs:
   platform:
     description: 'Platform type (github/gitea/bitbucket) for separate input mode'
     required: false
-  repoType:
+  repo-type:
     description: 'Alias for platform (github/gitea/bitbucket). If both platform and repo_type are provided, platform takes precedence.'
     required: false
   owner:
@@ -20,20 +20,20 @@ inputs:
   repo:
     description: 'Repository name (for separate input mode)'
     required: false
-  baseUrl:
+  base-url:
     description: 'Custom base URL for self-hosted instances (e.g., https://gitea.example.com)'
     required: false
   token:
     description: 'Custom Personal Access Token (works for all platforms). If not provided, automatically falls back to GITHUB_TOKEN environment variable when available (e.g., in GitHub Actions).'
     required: false
-  skipCertificateCheck:
+  skip-certificate-check:
     description: 'Skip TLS certificate verification (useful for self-hosted instances with self-signed certificates). Default: false'
     required: false
     default: 'false'
-  tagFormat:
+  tag-format:
     description: 'Format pattern(s) to filter tags. Supports single pattern (e.g., "X.X"), JSON array string (e.g., ["*.*.*", "*.*"]), or comma-separated values (e.g., "*.*.*,*.*"). Patterns are tried in order as fallbacks - if first pattern matches no tags, second pattern is tried, etc. When resolving "latest", only tags matching the first successful format pattern will be considered.'
     required: false
-  tagType:
+  tag-type:
     description: 'Type of item to fetch: "tags" (git tags) or "release" (platform releases). Default: "tags"'
     required: false
     default: 'tags'
@@ -46,23 +46,23 @@ outputs:
     description: 'Boolean indicating if item exists'
   name:
     description: 'Item name (tag name for tags/releases)'
-  itemSha:
+  item-sha:
     description: 'Item SHA (tag SHA for tags/releases)'
-  itemShaShort:
+  item-sha-short:
     description: 'Short item SHA (first 7 characters)'
-  itemType:
+  item-type:
     description: 'Item type (commit/tag/release)'
-  commitSha:
+  commit-sha:
     description: 'Commit SHA'
-  commitShaShort:
+  commit-sha-short:
     description: 'Short commit SHA (first 7 characters)'
   details:
     description: 'Item details (tag message or release body)'
   verified:
     description: 'Whether item is verified (tags only, false for releases)'
-  isDraft:
+  is-draft:
     description: 'Whether release is a draft (releases only, false for tags)'
-  isPrerelease:
+  is-prerelease:
     description: 'Whether release is a prerelease (releases only, false for tags)'
 runs:
   using: 'node20'
@@ -70,4 +70,3 @@ runs:
 branding:
   icon: 'tag'
   color: 'blue'
-

@@ -21,15 +21,15 @@ jobs:
         id: local-tag
         uses: ./
         with:
-          tagName: v1.0.9
+          tag-name: v1.0.9
           repository: .
 
       - name: Verify local tag exists outputs
         run: |
           test "${{ steps.local-tag.outputs.exists }}" = "true"
           test -n "${{ steps.local-tag.outputs.name }}"
-          test -n "${{ steps.local-tag.outputs.itemSha }}"
-          test -n "${{ steps.local-tag.outputs.commitSha }}"
+          test -n "${{ steps.local-tag.outputs.item-sha }}"
+          test -n "${{ steps.local-tag.outputs.commit-sha }}"
 
       # Test: Verify action returns exists=false for non-existent tags
       # Note: This will show a warning annotation (expected) - the action logs a warning when tag doesn't exist
@@ -37,7 +37,7 @@ jobs:
         id: local-tag-missing
         uses: ./
         with:
-          tagName: v999.999.999
+          tag-name: v999.999.999
           repository: .
         continue-on-error: true
 
@@ -49,20 +49,20 @@ jobs:
         id: github-url
         uses: ./
         with:
-          tagName: v1.0.9
+          tag-name: v1.0.9
           repository: https://github.com/LiquidLogicLabs/git-action-tag-info
 
       - name: Verify GitHub URL outputs
         run: |
           test "${{ steps.github-url.outputs.exists }}" = "true"
           test -n "${{ steps.github-url.outputs.name }}"
-          test -n "${{ steps.github-url.outputs.itemSha }}"
+          test -n "${{ steps.github-url.outputs.item-sha }}"
 
       - name: Action e2e - GitHub separate inputs
         id: github-separate
         uses: ./
         with:
-          tagName: v1.0.9
+          tag-name: v1.0.9
           platform: github
           owner: LiquidLogicLabs
           repo: git-action-tag-info
@@ -76,7 +76,7 @@ jobs:
         id: latest-local
         uses: ./
         with:
-          tagName: latest
+          tag-name: latest
           repository: .
 
       - name: Verify latest local
@@ -91,9 +91,9 @@ jobs:
         id: tag-format
         uses: ./
         with:
-          tagName: latest
+          tag-name: latest
           repository: .
-          tagFormat: 'X.X.X,X.X'
+          tag-format: 'X.X.X,X.X'
         continue-on-error: true
 
       - name: Verify tag format (best-effort)
@@ -105,17 +105,16 @@ jobs:
             echo "Format test skipped/failed (no matching tags)"
           fi
 
-      # Test: Verify action fails when required tagName input is missing
+      # Test: Verify action fails when required tag-name input is missing
       # Note: This will show an error annotation (expected) - the action correctly fails validation
       # The test uses continue-on-error because we're testing that the action fails as expected
-      - name: Action e2e - Missing tagName (expects failure)
+      - name: Action e2e - Missing tag-name (expects failure)
         id: missing-tag
         uses: ./
         with:
           repository: .
         continue-on-error: true
 
-      - name: Verify missing tagName failure
+      - name: Verify missing tag-name failure
         run: |
           test "${{ steps.missing-tag.outcome }}" != "success"
-

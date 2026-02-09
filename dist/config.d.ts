@@ -14,6 +14,7 @@ export interface ActionInputs {
     ignoreCertErrors: boolean;
     tagFormat?: string[];
     verbose: boolean;
+    debugMode: boolean;
 }
 /**
  * Get and validate action inputs

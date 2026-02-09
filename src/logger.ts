@@ -6,9 +6,11 @@ import * as core from '@actions/core';
  */
 export class Logger {
   public readonly verbose: boolean;
+  public readonly debugMode: boolean;
 
-  constructor(verbose: boolean = false) {
-    this.verbose = verbose;
+  constructor(verbose: boolean = false, debugMode: boolean = false) {
+    this.verbose = verbose || debugMode;
+    this.debugMode = debugMode;
   }
 
   info(message: string): void {
@@ -24,15 +26,33 @@ export class Logger {
   }
 
   /**
-   * Log a debug message - uses core.info() when verbose is true so it always shows
-   * Falls back to core.debug() when verbose is false (for when ACTIONS_STEP_DEBUG is set)
+   * Log operational/verbose info - only shown when verbose is true
+   * Use for: platform detected, tag found, input values resolved, git commands executed
+   */
+  verboseInfo(message: string): void {
+    if (this.verbose) {
+      core.info(message);
+    }
+  }
+
+  /**
+   * Log a debug message - uses core.info() when debugMode is true so it always shows
+   * Falls back to core.debug() when debugMode is false (for when ACTIONS_STEP_DEBUG is set)
+   * Use for: HTTP requests/responses, headers, response bodies, raw data
    */
   debug(message: string): void {
-    if (this.verbose) {
+    if (this.debugMode) {
       core.info(`[DEBUG] ${message}`);
     } else {
       core.debug(message);
     }
   }
-}
 
+  isVerbose(): boolean {
+    return this.verbose;
+  }
+
+  isDebug(): boolean {
+    return this.debugMode;
+  }
+}

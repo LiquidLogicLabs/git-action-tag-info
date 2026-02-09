@@ -27980,28 +27980,33 @@ function getOptionalInput(name) {
  * Get and validate action inputs
  */
 function getInputs() {
-    const tagName = core.getInput('tagName', { required: true });
+    const tagName = core.getInput('tag-name', { required: true });
     if (!tagName || tagName.trim() === '') {
-        throw new Error('tagName is required and cannot be empty');
+        throw new Error('tag-name is required and cannot be empty');
     }
-    const tagTypeInput = core.getInput('tagType') || 'tags';
+    const tagTypeInput = core.getInput('tag-type') || 'tags';
     if (tagTypeInput !== 'tags' && tagTypeInput !== 'release') {
         throw new Error(`Invalid tagType: ${tagTypeInput}. Must be 'tags' or 'release'`);
     }
     const tagType = tagTypeInput;
     const repository = getOptionalInput('repository');
-    const platform = getOptionalInput('platform') || getOptionalInput('repoType');
+    const platform = getOptionalInput('platform') || getOptionalInput('repo-type');
     const owner = getOptionalInput('owner');
     const repo = getOptionalInput('repo');
-    const baseUrl = getOptionalInput('baseUrl');
+    const baseUrl = getOptionalInput('base-url');
     const token = getOptionalInput('token');
-    const ignoreCertErrors = getBooleanInput('skipCertificateCheck', false);
-    const tagFormatInput = getOptionalInput('tagFormat');
+    const ignoreCertErrors = getBooleanInput('skip-certificate-check', false);
+    const tagFormatInput = getOptionalInput('tag-format');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
     const verboseInput = getBooleanInput('verbose', false);
-    const envStepDebug = (process.env.ACTIONS_STEP_DEBUG || '').toLowerCase();
-    const stepDebugEnabled = core.isDebug() || envStepDebug === 'true' || envStepDebug === '1';
-    const verbose = verboseInput || stepDebugEnabled;
+    function parseBoolean(val) {
+        return val?.toLowerCase() === 'true' || val === '1';
+    }
+    const debugMode = (typeof core.isDebug === 'function' && core.isDebug()) ||
+        parseBoolean(process.env.ACTIONS_STEP_DEBUG) ||
+        parseBoolean(process.env.ACTIONS_RUNNER_DEBUG) ||
+        parseBoolean(process.env.RUNNER_DEBUG);
+    const verbose = verboseInput || debugMode;
     // Validate base URL format if provided
     if (baseUrl) {
         try {
@@ -28023,6 +28028,7 @@ function getInputs() {
         ignoreCertErrors,
         tagFormat,
         verbose,
+        debugMode,
     };
 }
 /**
@@ -28533,7 +28539,7 @@ async function run() {
     try {
         // Get and validate inputs
         const inputs = (0, config_1.getInputs)();
-        const logger = new logger_1.Logger(inputs.verbose);
+        const logger = new logger_1.Logger(inputs.verbose, inputs.debugMode);
         const shortSha = (value) => (value ? value.substring(0, 7) : '');
         // Warn if certificate errors are being ignored (security risk)
         if (inputs.ignoreCertErrors) {
@@ -28573,33 +28579,33 @@ async function run() {
         // Set outputs with normalized field names
         core.setOutput('exists', itemInfo.exists.toString());
         core.setOutput('name', itemInfo.name);
-        core.setOutput('itemSha', itemInfo.item_sha);
-        core.setOutput('itemShaShort', shortSha(itemInfo.item_sha));
-        core.setOutput('itemType', itemInfo.item_type);
-        core.setOutput('commitSha', itemInfo.commit_sha);
-        core.setOutput('commitShaShort', shortSha(itemInfo.commit_sha));
+        core.setOutput('item-sha', itemInfo.item_sha);
+        core.setOutput('item-sha-short', shortSha(itemInfo.item_sha));
+        core.setOutput('item-type', itemInfo.item_type);
+        core.setOutput('commit-sha', itemInfo.commit_sha);
+        core.setOutput('commit-sha-short', shortSha(itemInfo.commit_sha));
         core.setOutput('details', itemInfo.details);
         core.setOutput('verified', itemInfo.verified.toString());
-        core.setOutput('isDraft', itemInfo.is_draft.toString());
-        core.setOutput('isPrerelease', itemInfo.is_prerelease.toString());
+        core.setOutput('is-draft', itemInfo.is_draft.toString());
+        core.setOutput('is-prerelease', itemInfo.is_prerelease.toString());
         if (!itemInfo.exists) {
             logger.warning(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" does not exist in the repository`);
         }
         else {
             logger.info(`${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`);
-            logger.debug(`name: ${itemInfo.name}`);
-            logger.debug(`itemSha: ${itemInfo.item_sha}`);
-            logger.debug(`itemType: ${itemInfo.item_type}`);
-            logger.debug(`commitSha: ${itemInfo.commit_sha}`);
+            logger.verboseInfo(`name: ${itemInfo.name}`);
+            logger.verboseInfo(`item-sha: ${itemInfo.item_sha}`);
+            logger.verboseInfo(`item-type: ${itemInfo.item_type}`);
+            logger.verboseInfo(`commit-sha: ${itemInfo.commit_sha}`);
             if (itemInfo.details) {
                 logger.debug(`details: ${itemInfo.details.substring(0, 100)}...`);
             }
             if (inputs.tagType === 'release') {
-                logger.debug(`isDraft: ${itemInfo.is_draft}`);
-                logger.debug(`isPrerelease: ${itemInfo.is_prerelease}`);
+                logger.verboseInfo(`is-draft: ${itemInfo.is_draft}`);
+                logger.verboseInfo(`is-prerelease: ${itemInfo.is_prerelease}`);
             }
             if (inputs.tagType === 'tags' && itemInfo.verified) {
-                logger.debug(`verified: ${itemInfo.verified}`);
+                logger.verboseInfo(`verified: ${itemInfo.verified}`);
             }
         }
     }
@@ -28665,8 +28671,10 @@ const core = __importStar(__nccwpck_require__(7484));
  */
 class Logger {
     verbose;
-    constructor(verbose = false) {
-        this.verbose = verbose;
+    debugMode;
+    constructor(verbose = false, debugMode = false) {
+        this.verbose = verbose || debugMode;
+        this.debugMode = debugMode;
     }
     info(message) {
         core.info(message);
@@ -28678,16 +28686,32 @@ class Logger {
         core.error(message);
     }
     /**
-     * Log a debug message - uses core.info() when verbose is true so it always shows
-     * Falls back to core.debug() when verbose is false (for when ACTIONS_STEP_DEBUG is set)
+     * Log operational/verbose info - only shown when verbose is true
+     * Use for: platform detected, tag found, input values resolved, git commands executed
+     */
+    verboseInfo(message) {
+        if (this.verbose) {
+            core.info(message);
+        }
+    }
+    /**
+     * Log a debug message - uses core.info() when debugMode is true so it always shows
+     * Falls back to core.debug() when debugMode is false (for when ACTIONS_STEP_DEBUG is set)
+     * Use for: HTTP requests/responses, headers, response bodies, raw data
      */
     debug(message) {
-        if (this.verbose) {
+        if (this.debugMode) {
             core.info(`[DEBUG] ${message}`);
         }
         else {
             core.debug(message);
         }
+    }
+    isVerbose() {
+        return this.verbose;
+    }
+    isDebug() {
+        return this.debugMode;
     }
 }
 exports.Logger = Logger;

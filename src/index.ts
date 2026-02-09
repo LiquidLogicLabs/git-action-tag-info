@@ -13,7 +13,7 @@ async function run(): Promise<void> {
   try {
     // Get and validate inputs
     const inputs = getInputs();
-    const logger = new Logger(inputs.verbose);
+    const logger = new Logger(inputs.verbose, inputs.debugMode);
     const shortSha = (value?: string): string => (value ? value.substring(0, 7) : '');
 
     // Warn if certificate errors are being ignored (security risk)
@@ -75,15 +75,15 @@ async function run(): Promise<void> {
     // Set outputs with normalized field names
     core.setOutput('exists', itemInfo.exists.toString());
     core.setOutput('name', itemInfo.name);
-    core.setOutput('itemSha', itemInfo.item_sha);
-    core.setOutput('itemShaShort', shortSha(itemInfo.item_sha));
-    core.setOutput('itemType', itemInfo.item_type);
-    core.setOutput('commitSha', itemInfo.commit_sha);
-    core.setOutput('commitShaShort', shortSha(itemInfo.commit_sha));
+    core.setOutput('item-sha', itemInfo.item_sha);
+    core.setOutput('item-sha-short', shortSha(itemInfo.item_sha));
+    core.setOutput('item-type', itemInfo.item_type);
+    core.setOutput('commit-sha', itemInfo.commit_sha);
+    core.setOutput('commit-sha-short', shortSha(itemInfo.commit_sha));
     core.setOutput('details', itemInfo.details);
     core.setOutput('verified', itemInfo.verified.toString());
-    core.setOutput('isDraft', itemInfo.is_draft.toString());
-    core.setOutput('isPrerelease', itemInfo.is_prerelease.toString());
+    core.setOutput('is-draft', itemInfo.is_draft.toString());
+    core.setOutput('is-prerelease', itemInfo.is_prerelease.toString());
 
     if (!itemInfo.exists) {
       logger.warning(
@@ -93,19 +93,19 @@ async function run(): Promise<void> {
       logger.info(
         `${itemTypeLabel.charAt(0).toUpperCase() + itemTypeLabel.slice(1)} "${resolvedTagName}" found successfully`
       );
-      logger.debug(`name: ${itemInfo.name}`);
-      logger.debug(`itemSha: ${itemInfo.item_sha}`);
-      logger.debug(`itemType: ${itemInfo.item_type}`);
-      logger.debug(`commitSha: ${itemInfo.commit_sha}`);
+      logger.verboseInfo(`name: ${itemInfo.name}`);
+      logger.verboseInfo(`item-sha: ${itemInfo.item_sha}`);
+      logger.verboseInfo(`item-type: ${itemInfo.item_type}`);
+      logger.verboseInfo(`commit-sha: ${itemInfo.commit_sha}`);
       if (itemInfo.details) {
         logger.debug(`details: ${itemInfo.details.substring(0, 100)}...`);
       }
       if (inputs.tagType === 'release') {
-        logger.debug(`isDraft: ${itemInfo.is_draft}`);
-        logger.debug(`isPrerelease: ${itemInfo.is_prerelease}`);
+        logger.verboseInfo(`is-draft: ${itemInfo.is_draft}`);
+        logger.verboseInfo(`is-prerelease: ${itemInfo.is_prerelease}`);
       }
       if (inputs.tagType === 'tags' && itemInfo.verified) {
-        logger.debug(`verified: ${itemInfo.verified}`);
+        logger.verboseInfo(`verified: ${itemInfo.verified}`);
       }
     }
   } catch (error) {

@@ -367,6 +367,10 @@ Query releases from remote repositories. Releases are not supported for local re
 | `is-draft` | Whether release is a draft (releases only, false for tags) |
 | `is-prerelease` | Whether release is a prerelease (releases only, false for tags) |
 
+## Permissions
+
+No special permissions are required. Typical workflows need `contents: read` for checkout.
+
 ## Workflow Examples
 
 ### Using Default GITHUB_TOKEN (No Token Input Required)

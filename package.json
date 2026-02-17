@@ -17,7 +17,7 @@
     "test:act:ci": "act --container-options \"--user $(id -u):$(id -g)\" --env-file .act.env --var-file .act.vars --secret-file .act.secrets -W .github/workflows/ci.yml",
     "test:act:release": "act --container-options \"--user $(id -u):$(id -g)\" --env-file .act.env --var-file .act.vars --secret-file .act.secrets push --eventpath .github/workflows/.act/event-release.json",
     "lint:act": "act --container-options \"--user $(id -u):$(id -g)\" --env-file .act.env --var-file .act.vars --secret-file .act.secrets -W .github/workflows/ci.yml -j lint",
-    "lint": "eslint src/**/*.ts --no-warn-ignored",
+    "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "release:patch": "npm run package && standard-version --release-as patch --skip.changelog && (V=$(node -p \"require('./package.json').version\") && git add dist/ && git commit --amend --no-edit && git tag -f v$V) && npm run release:push",
     "release:minor": "npm run package && standard-version --release-as minor --skip.changelog && (V=$(node -p \"require('./package.json').version\") && git add dist/ && git commit --amend --no-edit && git tag -f v$V) && npm run release:push",

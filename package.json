@@ -1,6 +1,6 @@
 {
   "name": "tag-info-action",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Get tag information from local and remote repositories (GitHub, Gitea, Bitbucket)",
   "main": "dist/index.js",
   "scripts": {

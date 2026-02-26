@@ -342,6 +342,7 @@ Query releases from remote repositories. Releases are not supported for local re
 | `tag-name` | Tag name or "latest" to get the most recent tag | Yes | - |
 | `repository` | Repository URL or local path. Auto-detects: URLs (http://, https://, git@) → Remote repository, Paths → Local repository. Examples: `https://github.com/owner/repo`, `./my-repo`, `/path/to/repo` | No | - |
 | `platform` | Platform type (github/gitea/bitbucket) for separate input mode | No | - |
+| `repo-type` | Alias for platform (github/gitea/bitbucket). If both platform and repo-type are provided, platform takes precedence | No | - |
 | `owner` | Repository owner (for separate input mode) | No | - |
 | `repo` | Repository name (for separate input mode) | No | - |
 | `base-url` | Custom base URL for self-hosted instances (e.g., https://gitea.example.com) | No | - |

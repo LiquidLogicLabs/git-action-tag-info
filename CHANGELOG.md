@@ -1,3 +1,12 @@
+## [2.0.2](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.1...v2.0.2) (2026-04-21)
+
+
+### Bug Fixes
+
+* correct action runtime to node24 ([c120437](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/c12043748133727385c0662db01ab27c63bd7108))
+
+
+
 ## [2.0.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.0...v2.0.1) (2026-02-17)
 
 

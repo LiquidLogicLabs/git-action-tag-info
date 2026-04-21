@@ -1,43 +1,105 @@
-# Changelog
+## [2.0.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.0...v2.0.1) (2026-02-17)
 
-All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+# [2.0.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.3.0...v2.0.0) (2026-02-09)
 
-### Added
-- `tag_type` input to support both git tags and platform releases (default: "tags")
-- Release support for GitHub, Gitea, and Bitbucket platforms
-- `is_draft` and `is_prerelease` outputs for release information
-- Support for resolving "latest" releases using the same strategy as tags
 
-### Changed
-- **BREAKING**: Normalized all output field names:
-  - `tag_name` → `name`
-  - `tag_sha` → `item_sha`
-  - `tag_type` → `item_type` (now returns "commit", "tag", or "release" instead of "commit" or "annotated")
-  - `tag_message` → `details`
-- Internal type system: `TagInfo` interface renamed to `ItemInfo` (TagInfo kept as alias for compatibility)
-- `TagType` enum replaced with `ItemType` enum (COMMIT, TAG, RELEASE)
 
-### Fixed
-- All test workflows updated to use normalized output field names
+# [1.3.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.7...v1.3.0) (2026-02-07)
 
-## [1.0.0] - 2025-01-XX
 
-### Added
-- Initial implementation
-- Support for local repositories via git CLI
-- Support for GitHub repositories via API
-- Support for Gitea repositories via API
-- Support for Bitbucket repositories via API
-- Unified `repository` input that auto-detects URLs vs local paths
-- Separate input mode (platform/owner/repo) for remote repositories
-- "latest" tag resolution with semver-first, date fallback strategy
-- Comprehensive tag information (SHA, commit SHA, type, message, verification)
-- CI/CD workflows for linting, type checking, and building
-- Release workflow for automated releases on semver tags
-- Comprehensive documentation with usage examples
+### Bug Fixes
+
+* align e2e input names ([02d0757](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/02d0757a97fc0746cb25d632cef0cb4fe6e5898b))
+* align e2e output names ([ed4632a](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/ed4632aad6a5c3aa710edc373e1d9c6f91ca62c9))
+* align tag info inputs and outputs ([a259ace](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/a259ace13a103c3aa9fa5112006ac07eb1f2c459))
+
+
+
+## [1.2.7](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.6...v1.2.7) (2026-01-30)
+
+
+
+## [1.2.6](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.5...v1.2.6) (2026-01-30)
+
+
+
+## [1.2.5](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.4...v1.2.5) (2026-01-30)
+
+
+### Bug Fixes
+
+* **release:** verify only runtime bundle (index.js), allow .d.ts.map drift ([78c6add](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/78c6add122f18a5895622cbb8cb68bf6fb4173ad))
+
+
+
+## [1.2.4](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.3...v1.2.4) (2026-01-27)
+
+
+
+## [1.2.3](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.1...v1.2.3) (2026-01-27)
+
+
+
+## [1.2.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.2.0...v1.2.1) (2026-01-18)
+
+
+### Features
+
+* Add git ls-remote fallback for all platform providers ([5c28ac4](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/5c28ac4183181120d692bdab43875d424df0dfff))
+
+
+
+# [1.2.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.1.1...v1.2.0) (2026-01-12)
+
+
+
+## [1.1.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.1.0...v1.1.1) (2026-01-12)
+
+
+
+# [1.1.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.9...v1.1.0) (2026-01-01)
+
+
+
+## [1.0.9](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.8...v1.0.9) (2026-01-01)
+
+
+
+## [1.0.8](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.7...v1.0.8) (2026-01-01)
+
+
+
+## [1.0.7](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.6...v1.0.7) (2025-12-31)
+
+
+
+## [1.0.6](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.5...v1.0.6) (2025-12-31)
+
+
+
+## [1.0.5](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.4...v1.0.5) (2025-12-30)
+
+
+
+## [1.0.4](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.3...v1.0.4) (2025-12-30)
+
+
+
+## [1.0.3](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.2...v1.0.3) (2025-12-24)
+
+
+
+## [1.0.2](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.1...v1.0.2) (2025-12-23)
+
+
+
+## [1.0.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v1.0.0...v1.0.1) (2025-12-23)
+
+
+
+# 1.0.0 (2025-12-23)
+
+
 

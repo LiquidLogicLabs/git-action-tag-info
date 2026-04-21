@@ -48,3 +48,7 @@ coverage/
 .secrets
 .secrets.*
 .actrc.local
+
+
+# npm registry auth (keep local; do not commit credentials)
+.npmrc

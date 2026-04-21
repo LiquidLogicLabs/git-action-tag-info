@@ -65,7 +65,7 @@ outputs:
   is-prerelease:
     description: 'Whether release is a prerelease (releases only, false for tags)'
 runs:
-  using: 'node20'
+  using: 'node22'
   main: 'dist/index.js'
 branding:
   icon: 'tag'

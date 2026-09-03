@@ -34,18 +34,6 @@ function tagExists(tagName, repoPath) {
     }
 }
 /**
- * Check if tag exists on remote
- */
-function tagExistsOnRemote(tagName, remote, repoPath) {
-    try {
-        const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
-        return output.trim().length > 0;
-    }
-    catch {
-        return false;
-    }
-}
-/**
  * Get tag SHA
  */
 function getTagSha(tagName, repoPath) {

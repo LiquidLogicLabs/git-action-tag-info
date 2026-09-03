@@ -33847,7 +33847,7 @@ function matchTagFormat(tagName, format) {
         try {
             regex = new RegExp(regexStr);
         }
-        catch (error) {
+        catch {
             // Invalid regex, return false
             return false;
         }
@@ -34001,18 +34001,6 @@ function tagExists(tagName, repoPath) {
     try {
         execGit(`rev-parse --verify --quiet refs/tags/${tagName}`, repoPath);
         return true;
-    }
-    catch {
-        return false;
-    }
-}
-/**
- * Check if tag exists on remote
- */
-function tagExistsOnRemote(tagName, remote, repoPath) {
-    try {
-        const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
-        return output.trim().length > 0;
     }
     catch {
         return false;

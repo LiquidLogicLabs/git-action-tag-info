@@ -140,7 +140,7 @@ function matchTagFormat(tagName, format) {
         try {
             regex = new RegExp(regexStr);
         }
-        catch (error) {
+        catch {
             // Invalid regex, return false
             return false;
         }

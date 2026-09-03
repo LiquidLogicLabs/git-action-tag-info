@@ -31,18 +31,6 @@ function tagExists(tagName: string, repoPath: string): boolean {
 }
 
 /**
- * Check if tag exists on remote
- */
-function tagExistsOnRemote(tagName: string, remote: string, repoPath: string): boolean {
-  try {
-    const output = execGit(`ls-remote --tags ${remote} refs/tags/${tagName}`, repoPath);
-    return output.trim().length > 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Get tag SHA
  */
 function getTagSha(tagName: string, repoPath: string): string {

@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import { PlatformAPI, Platform } from './types';
+import { PlatformAPI } from './types';
 import { isSemver, sortTagsBySemver } from './semver';
 import { filterTagsByFormat } from './format-matcher';
 

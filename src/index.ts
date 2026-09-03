@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import { ItemInfo, Platform } from './types';
+import { Platform } from './types';
 import { getInputs, resolveToken } from './config';
 import { getRepositoryInfo } from './repo-utils';
 import { createPlatformAPI } from './platforms/platform-factory';

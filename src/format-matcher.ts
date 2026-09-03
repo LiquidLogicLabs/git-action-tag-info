@@ -146,7 +146,7 @@ export function matchTagFormat(tagName: string, format: string): boolean {
     
     try {
       regex = new RegExp(regexStr);
-    } catch (error) {
+    } catch {
       // Invalid regex, return false
       return false;
     }

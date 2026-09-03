@@ -1,3 +1,13 @@
+## [2.0.4](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.3...v2.0.4) (2026-09-03)
+
+
+### Bug Fixes
+
+* **lint:** quote eslint glob so all of src/ is linted ([d2b1ade](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/d2b1ade7eb7a3bbe5565faec3633232da6cc246f))
+* **lint:** resolve unused-var errors surfaced by widened glob ([17d42a0](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/17d42a0347c0446b6cee3ef24c22370d465f4c51))
+
+
+
 ## [2.0.3](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.2...v2.0.3) (2026-07-05)
 
 

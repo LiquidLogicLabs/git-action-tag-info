@@ -40,6 +40,7 @@ exports.determineBaseUrl = determineBaseUrl;
 const https = __importStar(require("https"));
 const types_1 = require("../types");
 const git_fallback_1 = require("./git-fallback");
+const repo_utils_1 = require("../repo-utils");
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
  */
@@ -127,7 +128,7 @@ class BitbucketAPI {
      * Get tag information
      */
     async getTagInfo(tagName) {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags/${tagName}`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
         try {
             const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
             if (response.statusCode === 404) {
@@ -207,7 +208,7 @@ class BitbucketAPI {
      * Get all tag names (optimized, no dates)
      */
     async getAllTagNames() {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
         try {
             const allTagNames = [];
             let nextUrl = url;
@@ -243,7 +244,7 @@ class BitbucketAPI {
      * Get all tags with dates
      */
     async getAllTags() {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
         try {
             const allTags = [];
             let nextUrl = url;

@@ -7,6 +7,7 @@ exports.determineBaseUrl = determineBaseUrl;
 const types_1 = require("../types");
 const http_client_1 = require("./http-client");
 const git_fallback_1 = require("./git-fallback");
+const repo_utils_1 = require("../repo-utils");
 /**
  * Gitea API client
  */
@@ -37,7 +38,7 @@ class GiteaAPI {
      * Get tag information
      */
     async getTagInfo(tagName) {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${tagName}`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
         try {
             const response = await this.client.get(url);
             if (response.statusCode === 404) {
@@ -72,7 +73,7 @@ class GiteaAPI {
             let verified = false;
             if (objectType === 'tag') {
                 // Fetch the tag object
-                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${objectSha}`;
+                const tagUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/tags/${(0, repo_utils_1.safeSegment)(objectSha, 'tag object SHA')}`;
                 const tagResponse = await this.client.get(tagUrl);
                 if (tagResponse.statusCode === 200) {
                     const tagData = JSON.parse(tagResponse.body);
@@ -110,11 +111,11 @@ class GiteaAPI {
             let releaseUrl;
             if (tagName.toLowerCase() === 'latest') {
                 // Get latest release
-                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/latest`;
+                releaseUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases/latest`;
             }
             else {
                 // Get release by tag
-                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/tags/${tagName}`;
+                releaseUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
             }
             const response = await this.client.get(releaseUrl);
             if (response.statusCode === 404) {
@@ -138,14 +139,14 @@ class GiteaAPI {
             let itemSha = '';
             let commitSha = '';
             try {
-                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${releaseData.tag_name}`;
+                const tagUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(releaseData.tag_name, 'tag name')}`;
                 const tagResponse = await this.client.get(tagUrl);
                 if (tagResponse.statusCode === 200) {
                     const refData = JSON.parse(tagResponse.body);
                     itemSha = refData.object?.sha || '';
                     // Get commit SHA from tag object if it's an annotated tag
                     if (refData.object?.type === 'tag' && itemSha) {
-                        const tagObjUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${itemSha}`;
+                        const tagObjUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/tags/${(0, repo_utils_1.safeSegment)(itemSha, 'tag object SHA')}`;
                         const tagObjResponse = await this.client.get(tagObjUrl);
                         if (tagObjResponse.statusCode === 200) {
                             const tagObjData = JSON.parse(tagObjResponse.body);
@@ -186,7 +187,7 @@ class GiteaAPI {
      * Get all tag names (optimized, no dates)
      */
     async getAllTagNames() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/tags?limit=100`;
         try {
             const allTagNames = [];
             let page = 1;
@@ -229,7 +230,7 @@ class GiteaAPI {
      * Get all tags with dates
      */
     async getAllTags() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/tags?limit=100`;
         try {
             const allTags = [];
             let page = 1;
@@ -272,7 +273,7 @@ class GiteaAPI {
      * Get all release names (optimized, no dates)
      */
     async getAllReleaseNames() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases?limit=100`;
         try {
             const allReleaseNames = [];
             let page = 1;
@@ -315,7 +316,7 @@ class GiteaAPI {
      * Get all releases with dates
      */
     async getAllReleases() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases?limit=100`;
         try {
             const allReleases = [];
             let page = 1;

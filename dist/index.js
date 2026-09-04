@@ -34419,6 +34419,7 @@ exports.determineBaseUrl = determineBaseUrl;
 const https = __importStar(__nccwpck_require__(5692));
 const types_1 = __nccwpck_require__(6141);
 const git_fallback_1 = __nccwpck_require__(8715);
+const repo_utils_1 = __nccwpck_require__(4595);
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
  */
@@ -34506,7 +34507,7 @@ class BitbucketAPI {
      * Get tag information
      */
     async getTagInfo(tagName) {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags/${tagName}`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
         try {
             const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
             if (response.statusCode === 404) {
@@ -34586,7 +34587,7 @@ class BitbucketAPI {
      * Get all tag names (optimized, no dates)
      */
     async getAllTagNames() {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
         try {
             const allTagNames = [];
             let nextUrl = url;
@@ -34622,7 +34623,7 @@ class BitbucketAPI {
      * Get all tags with dates
      */
     async getAllTags() {
-        const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+        const url = `${this.baseUrl}/repositories/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
         try {
             const allTags = [];
             let nextUrl = url;
@@ -34841,6 +34842,7 @@ exports.determineBaseUrl = determineBaseUrl;
 const types_1 = __nccwpck_require__(6141);
 const http_client_1 = __nccwpck_require__(3696);
 const git_fallback_1 = __nccwpck_require__(8715);
+const repo_utils_1 = __nccwpck_require__(4595);
 /**
  * Gitea API client
  */
@@ -34871,7 +34873,7 @@ class GiteaAPI {
      * Get tag information
      */
     async getTagInfo(tagName) {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${tagName}`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
         try {
             const response = await this.client.get(url);
             if (response.statusCode === 404) {
@@ -34906,7 +34908,7 @@ class GiteaAPI {
             let verified = false;
             if (objectType === 'tag') {
                 // Fetch the tag object
-                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${objectSha}`;
+                const tagUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/tags/${(0, repo_utils_1.safeSegment)(objectSha, 'tag object SHA')}`;
                 const tagResponse = await this.client.get(tagUrl);
                 if (tagResponse.statusCode === 200) {
                     const tagData = JSON.parse(tagResponse.body);
@@ -34944,11 +34946,11 @@ class GiteaAPI {
             let releaseUrl;
             if (tagName.toLowerCase() === 'latest') {
                 // Get latest release
-                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/latest`;
+                releaseUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases/latest`;
             }
             else {
                 // Get release by tag
-                releaseUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases/tags/${tagName}`;
+                releaseUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
             }
             const response = await this.client.get(releaseUrl);
             if (response.statusCode === 404) {
@@ -34972,14 +34974,14 @@ class GiteaAPI {
             let itemSha = '';
             let commitSha = '';
             try {
-                const tagUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/refs/tags/${releaseData.tag_name}`;
+                const tagUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(releaseData.tag_name, 'tag name')}`;
                 const tagResponse = await this.client.get(tagUrl);
                 if (tagResponse.statusCode === 200) {
                     const refData = JSON.parse(tagResponse.body);
                     itemSha = refData.object?.sha || '';
                     // Get commit SHA from tag object if it's an annotated tag
                     if (refData.object?.type === 'tag' && itemSha) {
-                        const tagObjUrl = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/git/tags/${itemSha}`;
+                        const tagObjUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/tags/${(0, repo_utils_1.safeSegment)(itemSha, 'tag object SHA')}`;
                         const tagObjResponse = await this.client.get(tagObjUrl);
                         if (tagObjResponse.statusCode === 200) {
                             const tagObjData = JSON.parse(tagObjResponse.body);
@@ -35020,7 +35022,7 @@ class GiteaAPI {
      * Get all tag names (optimized, no dates)
      */
     async getAllTagNames() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/tags?limit=100`;
         try {
             const allTagNames = [];
             let page = 1;
@@ -35063,7 +35065,7 @@ class GiteaAPI {
      * Get all tags with dates
      */
     async getAllTags() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/tags?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/tags?limit=100`;
         try {
             const allTags = [];
             let page = 1;
@@ -35106,7 +35108,7 @@ class GiteaAPI {
      * Get all release names (optimized, no dates)
      */
     async getAllReleaseNames() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases?limit=100`;
         try {
             const allReleaseNames = [];
             let page = 1;
@@ -35149,7 +35151,7 @@ class GiteaAPI {
      * Get all releases with dates
      */
     async getAllReleases() {
-        const url = `/repos/${this.repoInfo.owner}/${this.repoInfo.repo}/releases?limit=100`;
+        const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/releases?limit=100`;
         try {
             const allReleases = [];
             let page = 1;
@@ -36220,6 +36222,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.parseRepository = parseRepository;
 exports.getLocalRepositoryInfo = getLocalRepositoryInfo;
 exports.getRepositoryInfo = getRepositoryInfo;
+exports.safeSegment = safeSegment;
 const path = __importStar(__nccwpck_require__(6928));
 const exec = __importStar(__nccwpck_require__(5236));
 const io = __importStar(__nccwpck_require__(4994));
@@ -36441,6 +36444,34 @@ async function getRepositoryInfo(repository, platform, owner, repo, logger) {
     }
     logger.info(`Repository: ${repoInfo.owner || 'local'}/${repoInfo.repo || repoInfo.path || 'unknown'}`);
     return repoInfo;
+}
+/**
+ * Encode a value for use as a single path segment in an API URL.
+ *
+ * Interpolating a value straight into a path lets it redirect the request. Verified against
+ * WHATWG URL resolution, which is what both transports in this action apply — they build
+ * `new URL(baseUrl + path)` and then send `urlObj.pathname + urlObj.search`:
+ *
+ *   tag = "../../../user"  ->  /repos/o/r/git/refs/tags/../../../user  =>  /repos/o/user
+ *   tag = ".."             ->  /repos/o/r/git/refs/tags/..             =>  /repos/o/r/git/refs/
+ *
+ * The second is the dangerous one: it reads the whole COLLECTION rather than one item, so
+ * the action reports another ref's SHA as the tag the caller asked about.
+ *
+ * Every interpolated value is attacker-influenceable: tag names come from an action input
+ * or a pushed ref, owner/repo are parsed from the user-supplied `repository` input, and
+ * SHAs and `tag_name` come back from the forge's own response body.
+ *
+ * encodeURIComponent is necessary but not sufficient: it does not encode dots, so a bare
+ * "." or ".." survives it unchanged and is then removed by dot-segment normalisation. Those
+ * two are refused outright rather than encoded, because no legitimate tag, owner, repo or
+ * SHA is named "." or "..".
+ */
+function safeSegment(value, label) {
+    if (value === '.' || value === '..') {
+        throw new Error(`Refusing to use ${JSON.stringify(value)} as a ${label}: it would redirect the request to a different endpoint.`);
+    }
+    return encodeURIComponent(value);
 }
 
 

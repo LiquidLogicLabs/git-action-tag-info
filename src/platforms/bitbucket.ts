@@ -2,6 +2,7 @@ import * as https from 'https';
 import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, HttpResponse } from '../types';
 import { Logger } from '../logger';
 import { tryGitLsRemoteFallback } from './git-fallback';
+import { safeSegment } from '../repo-utils';
 
 /**
  * Make HTTP request for Bitbucket (uses Basic Auth)
@@ -108,7 +109,7 @@ export class BitbucketAPI implements PlatformAPI {
    * Get tag information
    */
   async getTagInfo(tagName: string): Promise<ItemInfo> {
-    const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags/${tagName}`;
+    const url = `${this.baseUrl}/repositories/${safeSegment(this.repoInfo.owner, 'owner')}/${safeSegment(this.repoInfo.repo, 'repository name')}/refs/tags/${safeSegment(tagName, 'tag name')}`;
 
     try {
       const response = await httpRequest(url, this.config.token, this.config.ignoreCertErrors, this.logger);
@@ -200,7 +201,7 @@ export class BitbucketAPI implements PlatformAPI {
    * Get all tag names (optimized, no dates)
    */
   async getAllTagNames(): Promise<string[]> {
-    const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+    const url = `${this.baseUrl}/repositories/${safeSegment(this.repoInfo.owner, 'owner')}/${safeSegment(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
 
     try {
       const allTagNames: string[] = [];
@@ -246,7 +247,7 @@ export class BitbucketAPI implements PlatformAPI {
    * Get all tags with dates
    */
   async getAllTags(): Promise<Array<{ name: string; date: string }>> {
-    const url = `${this.baseUrl}/repositories/${this.repoInfo.owner}/${this.repoInfo.repo}/refs/tags?pagelen=100`;
+    const url = `${this.baseUrl}/repositories/${safeSegment(this.repoInfo.owner, 'owner')}/${safeSegment(this.repoInfo.repo, 'repository name')}/refs/tags?pagelen=100`;
 
     try {
       const allTags: Array<{ name: string; date: string }> = [];

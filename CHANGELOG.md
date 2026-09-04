@@ -1,3 +1,12 @@
+## [2.0.6](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.5...v2.0.6) (2026-09-04)
+
+
+### Bug Fixes
+
+* encode every value interpolated into an API URL path ([1e66cd3](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/1e66cd313bbb27a5a7ba8388a2bc1ec445369905))
+
+
+
 ## [2.0.5](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.4...v2.0.5) (2026-09-04)
 
 

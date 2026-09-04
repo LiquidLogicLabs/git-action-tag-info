@@ -1,3 +1,12 @@
+## [2.0.8](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.7...v2.0.8) (2026-09-04)
+
+
+### Bug Fixes
+
+* give the release job its own registry credentials ([7381bcd](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/7381bcd978206c5cbe47fb9873ca79061e3b376a))
+
+
+
 ## [2.0.7](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.6...v2.0.7) (2026-09-04)
 
 

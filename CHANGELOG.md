@@ -1,3 +1,12 @@
+## [2.0.5](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.4...v2.0.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* run git through an argument array instead of a shell ([553be8b](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/553be8bfb8be35d6bfe3ce893b3f2024673e37a8))
+
+
+
 ## [2.0.4](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.3...v2.0.4) (2026-09-03)
 
 

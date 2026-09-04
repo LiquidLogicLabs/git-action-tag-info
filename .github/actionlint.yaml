@@ -1,0 +1,11 @@
+# actionlint configuration.
+#
+# Scoped ignores only, each with its reason. This file exists because actionlint is now run
+# across every workflow (it was pinned to ci.yml alone, which meant release.yml and
+# e2e-tests.yml — where nearly all the shell lives — were never checked).
+paths:
+  .github/workflows/e2e-tests.yml:
+    ignore:
+      # This step omits tag-name on purpose: it asserts the action FAILS without it, and
+      # runs under continue-on-error. Supplying the input would delete the test.
+      - 'missing input "tag-name" which is required by action "Get Tag Info"'

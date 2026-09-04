@@ -17,54 +17,67 @@ jobs:
     # Run action from committed dist only (no build). Ensures E2E fails if dist is unbundled.
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          # No step in this job pushes; the credential is not needed.
+          persist-credentials: false
           fetch-depth: 0  # Fetch full history for tags
 
       - name: Action e2e - Local tag exists
         id: local-tag
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: v1.0.9
           repository: .
 
       - name: Verify local tag exists outputs
+        env:
+          Z_LOCAL_TAG_OUTPUTS_EXISTS: ${{ steps.local-tag.outputs.exists }}
+          Z_LOCAL_TAG_OUTPUTS_NAME: ${{ steps.local-tag.outputs.name }}
+          Z_LOCAL_TAG_OUTPUTS_ITEM_SHA: ${{ steps.local-tag.outputs.item-sha }}
+          Z_LOCAL_TAG_OUTPUTS_COMMIT_SHA: ${{ steps.local-tag.outputs.commit-sha }}
         run: |
-          test "${{ steps.local-tag.outputs.exists }}" = "true"
-          test -n "${{ steps.local-tag.outputs.name }}"
-          test -n "${{ steps.local-tag.outputs.item-sha }}"
-          test -n "${{ steps.local-tag.outputs.commit-sha }}"
+          test "${Z_LOCAL_TAG_OUTPUTS_EXISTS}" = "true"
+          test -n "${Z_LOCAL_TAG_OUTPUTS_NAME}"
+          test -n "${Z_LOCAL_TAG_OUTPUTS_ITEM_SHA}"
+          test -n "${Z_LOCAL_TAG_OUTPUTS_COMMIT_SHA}"
 
       # Test: Verify action returns exists=false for non-existent tags
       # Note: This will show a warning annotation (expected) - the action logs a warning when tag doesn't exist
       - name: Action e2e - Local tag missing
         id: local-tag-missing
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: v999.999.999
           repository: .
         continue-on-error: true
 
       - name: Verify local tag missing
+        env:
+          Z_LOCAL_TAG_MISSING_OUTPUTS_EXISTS: ${{ steps.local-tag-missing.outputs.exists }}
         run: |
-          test "${{ steps.local-tag-missing.outputs.exists }}" = "false"
+          test "${Z_LOCAL_TAG_MISSING_OUTPUTS_EXISTS}" = "false"
 
       - name: Action e2e - GitHub URL
         id: github-url
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: v1.0.9
           repository: https://github.com/LiquidLogicLabs/git-action-tag-info
 
       - name: Verify GitHub URL outputs
+        env:
+          Z_GITHUB_URL_OUTPUTS_EXISTS: ${{ steps.github-url.outputs.exists }}
+          Z_GITHUB_URL_OUTPUTS_NAME: ${{ steps.github-url.outputs.name }}
+          Z_GITHUB_URL_OUTPUTS_ITEM_SHA: ${{ steps.github-url.outputs.item-sha }}
         run: |
-          test "${{ steps.github-url.outputs.exists }}" = "true"
-          test -n "${{ steps.github-url.outputs.name }}"
-          test -n "${{ steps.github-url.outputs.item-sha }}"
+          test "${Z_GITHUB_URL_OUTPUTS_EXISTS}" = "true"
+          test -n "${Z_GITHUB_URL_OUTPUTS_NAME}"
+          test -n "${Z_GITHUB_URL_OUTPUTS_ITEM_SHA}"
 
       - name: Action e2e - GitHub separate inputs
         id: github-separate
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: v1.0.9
           platform: github
@@ -72,28 +85,34 @@ jobs:
           repo: git-action-tag-info
 
       - name: Verify GitHub separate outputs
+        env:
+          Z_GITHUB_SEPARATE_OUTPUTS_EXISTS: ${{ steps.github-separate.outputs.exists }}
+          Z_GITHUB_SEPARATE_OUTPUTS_NAME: ${{ steps.github-separate.outputs.name }}
         run: |
-          test "${{ steps.github-separate.outputs.exists }}" = "true"
-          test -n "${{ steps.github-separate.outputs.name }}"
+          test "${Z_GITHUB_SEPARATE_OUTPUTS_EXISTS}" = "true"
+          test -n "${Z_GITHUB_SEPARATE_OUTPUTS_NAME}"
 
       - name: Action e2e - Latest local
         id: latest-local
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: latest
           repository: .
 
       - name: Verify latest local
+        env:
+          Z_LATEST_LOCAL_OUTPUTS_EXISTS: ${{ steps.latest-local.outputs.exists }}
+          Z_LATEST_LOCAL_OUTPUTS_NAME: ${{ steps.latest-local.outputs.name }}
         run: |
-          test "${{ steps.latest-local.outputs.exists }}" = "true"
-          test -n "${{ steps.latest-local.outputs.name }}"
+          test "${Z_LATEST_LOCAL_OUTPUTS_EXISTS}" = "true"
+          test -n "${Z_LATEST_LOCAL_OUTPUTS_NAME}"
 
       # Test: Verify tag format filtering works
       # Note: This may show a warning annotation if no tags match the format (expected behavior)
       # The test uses continue-on-error because format matching is best-effort
       - name: Action e2e - Tag format filter (comma)
         id: tag-format
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           tag-name: latest
           repository: .
@@ -102,9 +121,12 @@ jobs:
 
       - name: Verify tag format (best-effort)
         if: always()
+        env:
+          Z_TAG_FORMAT_OUTCOME: ${{ steps.tag-format.outcome }}
+          Z_TAG_FORMAT_OUTPUTS_NAME: ${{ steps.tag-format.outputs.name }}
         run: |
-          if [ "${{ steps.tag-format.outcome }}" = "success" ]; then
-            echo "Format resolved: ${{ steps.tag-format.outputs.name }}"
+          if [ "${Z_TAG_FORMAT_OUTCOME}" = "success" ]; then
+            echo "Format resolved: ${Z_TAG_FORMAT_OUTPUTS_NAME}"
           else
             echo "Format test skipped/failed (no matching tags)"
           fi
@@ -114,11 +136,13 @@ jobs:
       # The test uses continue-on-error because we're testing that the action fails as expected
       - name: Action e2e - Missing tag-name (expects failure)
         id: missing-tag
-        uses: ./
+        uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
           repository: .
         continue-on-error: true
 
       - name: Verify missing tag-name failure
+        env:
+          Z_MISSING_TAG_OUTCOME: ${{ steps.missing-tag.outcome }}
         run: |
-          test "${{ steps.missing-tag.outcome }}" != "success"
+          test "${Z_MISSING_TAG_OUTCOME}" != "success"

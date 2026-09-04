@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tryGitLsRemoteFallback = tryGitLsRemoteFallback;
 const child_process_1 = require("child_process");
 const types_1 = require("../types");
+const git_client_1 = require("../git-client");
 /**
  * Try to get tag information using git ls-remote as a fallback when API fails
  * This is platform-agnostic and works with any git repository
@@ -21,7 +22,12 @@ function tryGitLsRemoteFallback(tagName, repoUrl, logger) {
         logger.debug(`Attempting git ls-remote fallback for tag: ${tagName}`);
         // Normalize URL - remove .git suffix if present for ls-remote
         const remoteUrl = repoUrl.replace(/\.git$/, '');
-        const output = (0, child_process_1.execSync)(`git ls-remote --tags ${remoteUrl} refs/tags/${tagName}`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+        // Arguments go as an array so no shell parses them. The two guards below matter
+        // separately: git itself treats a leading "-" as an option, and `--upload-pack=<cmd>`
+        // makes ls-remote execute <cmd>. A repository URL is attacker-influenced input here.
+        (0, git_client_1.assertNotOptionLike)(remoteUrl, 'repository URL');
+        (0, git_client_1.assertNotOptionLike)(tagName, 'tag name');
+        const output = (0, child_process_1.execFileSync)('git', ['ls-remote', '--tags', remoteUrl, `refs/tags/${tagName}`], { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
         if (output.length > 0) {
             // Tag exists on remote, parse the SHA
             // Output format: "SHA\trefs/tags/tagName"

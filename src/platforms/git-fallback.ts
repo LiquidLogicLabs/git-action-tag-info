@@ -1,6 +1,7 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { ItemInfo, ItemType } from '../types';
 import { Logger } from '../logger';
+import { assertNotOptionLike } from '../git-client';
 
 /**
  * Try to get tag information using git ls-remote as a fallback when API fails
@@ -27,8 +28,15 @@ export function tryGitLsRemoteFallback(
     // Normalize URL - remove .git suffix if present for ls-remote
     const remoteUrl = repoUrl.replace(/\.git$/, '');
     
-    const output = execSync(
-      `git ls-remote --tags ${remoteUrl} refs/tags/${tagName}`,
+    // Arguments go as an array so no shell parses them. The two guards below matter
+    // separately: git itself treats a leading "-" as an option, and `--upload-pack=<cmd>`
+    // makes ls-remote execute <cmd>. A repository URL is attacker-influenced input here.
+    assertNotOptionLike(remoteUrl, 'repository URL');
+    assertNotOptionLike(tagName, 'tag name');
+
+    const output = execFileSync(
+      'git',
+      ['ls-remote', '--tags', remoteUrl, `refs/tags/${tagName}`],
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     ).trim();
 

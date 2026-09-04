@@ -1,11 +1,11 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { tryGitLsRemoteFallback } from '../platforms/git-fallback';
 import { Logger } from '../logger';
 import { ItemType } from '../types';
 
 // Mock child_process
 jest.mock('child_process', () => ({
-  execSync: jest.fn(),
+  execFileSync: jest.fn(),
 }));
 
 // Mock Logger
@@ -20,12 +20,12 @@ jest.mock('../logger', () => ({
 }));
 
 describe('git-fallback', () => {
-  let mockExecSync: jest.MockedFunction<typeof execSync>;
+  let mockExecSync: jest.MockedFunction<typeof execFileSync>;
   let logger: Logger;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockExecSync = execSync as jest.MockedFunction<typeof execSync>;
+    mockExecSync = execFileSync as jest.MockedFunction<typeof execFileSync>;
     logger = new Logger(false);
   });
 
@@ -56,8 +56,10 @@ describe('git-fallback', () => {
         is_prerelease: false,
       });
 
+      // Arguments are passed as an array, so no shell can interpret them.
       expect(mockExecSync).toHaveBeenCalledWith(
-        'git ls-remote --tags https://github.com/owner/repo refs/tags/v1.0.0',
+        'git',
+        ['ls-remote', '--tags', 'https://github.com/owner/repo', 'refs/tags/v1.0.0'],
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
       expect(logger.debug).toHaveBeenCalledWith('Attempting git ls-remote fallback for tag: v1.0.0');
@@ -72,8 +74,10 @@ describe('git-fallback', () => {
 
       tryGitLsRemoteFallback('v1.0.0', 'https://github.com/owner/repo.git', logger);
 
+      // Arguments are passed as an array, so no shell can interpret them.
       expect(mockExecSync).toHaveBeenCalledWith(
-        'git ls-remote --tags https://github.com/owner/repo refs/tags/v1.0.0',
+        'git',
+        ['ls-remote', '--tags', 'https://github.com/owner/repo', 'refs/tags/v1.0.0'],
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
     });
@@ -173,7 +177,8 @@ describe('git-fallback', () => {
         // Should normalize .git suffix
         const expectedUrl = url.replace(/\.git$/, '');
         expect(mockExecSync).toHaveBeenCalledWith(
-          `git ls-remote --tags ${expectedUrl} refs/tags/v1.0.0`,
+          'git',
+          ['ls-remote', '--tags', expectedUrl, 'refs/tags/v1.0.0'],
           { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
         );
       }

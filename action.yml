@@ -1,4 +1,4 @@
-name: 'Get Tag Info'
+name: 'Git Tag Info'
 description: 'Get tag information from local and remote repositories (GitHub, Gitea, Bitbucket)'
 author: 'LiquidLogicLabs'
 inputs:

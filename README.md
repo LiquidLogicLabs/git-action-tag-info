@@ -1,4 +1,4 @@
-# Get Tag Info Action
+# Git Tag Info
 
 [![CI](https://github.com/LiquidLogicLabs/git-action-tag-info/actions/workflows/ci.yml/badge.svg)](https://github.com/LiquidLogicLabs/git-action-tag-info/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -23,7 +23,7 @@ Get tag and release information from local and remote repositories (GitHub, Gite
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: ./my-repo
@@ -34,7 +34,7 @@ Get tag and release information from local and remote repositories (GitHub, Gite
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: https://github.com/owner/repo
@@ -46,7 +46,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: https://github.com/owner/repo
@@ -58,7 +58,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     platform: github
@@ -72,7 +72,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: https://gitea.example.com/owner/repo
@@ -85,7 +85,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info from self-hosted instance
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://git.example.com/owner/repo
@@ -99,7 +99,7 @@ Or with a custom token:
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: https://bitbucket.org/owner/repo
@@ -111,7 +111,7 @@ Or with a custom token:
 ```yaml
 - name: Get latest tag
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
@@ -128,7 +128,7 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
 ```yaml
 - name: Get latest version tag
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/linuxserver/docker-baseimage-alpine
@@ -163,42 +163,42 @@ Filter tags by format pattern when resolving "latest". This is useful when repos
 
 ```yaml
 # Match tags with format X.X (e.g., 3.23, 1.2)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: X.X
 
 # Match tags with format X.X.X (e.g., 1.2.3, 10.5.0)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: X.X.X
 
 # Match tags with v prefix (e.g., v1.2.3)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: vX.X.X
 
 # Match tags with wildcard pattern *.* (e.g., 3.23, abc.def)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: '*.*'  # Matches any two segments separated by a dot
 
 # Match tags with wildcard pattern *.*.* (e.g., 1.2.3, abc.def.ghi)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: '*.*.*'  # Matches any three segments separated by dots
 
 # Use regex for advanced patterns
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
@@ -218,28 +218,28 @@ You can provide multiple format patterns as fallbacks. Patterns are tried in ord
 
 ```yaml
 # Try 3-segment tags first (e.g., 3.19.5), fallback to 2-segment (e.g., 3.19)
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: '["*.*.*", "*.*"]'  # JSON array string format
 
 # Same as above, using comma-separated format
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: "*.*.*,*.*"  # Comma-separated format
 
 # Try numeric 3-segment, then 2-segment, then any 2-segment
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
     tag-format: '["X.X.X", "X.X", "*.*"]'
 
 # Try v-prefixed tags, then any tags
-- uses: LiquidLogicLabs/git-action-tag-info@v1
+- uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://github.com/owner/repo
@@ -260,17 +260,17 @@ This action supports flexible version pinning to balance stability and updates:
 **Major Version** (`@v1`):
 - Automatically updates to the latest `v1.x.x` release
 - Recommended for most users who want bug fixes and minor updates
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2`
 
 **Minor Version** (`@v1.0`):
 - Automatically updates to the latest `v1.0.x` patch release
 - Recommended when you want to stay on a specific minor version
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.0`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2`
 
 **Exact Version** (e.g. `@v1.2.3`):
 - Pins to a specific release
 - Recommended for production workflows requiring maximum stability
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v1.2.3` (pick a tag from Releases)
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2` (pick a tag from Releases)
 
 > **Note**: Major and minor version tags (e.g., `v1`, `v1.0`) are automatically created/updated with each stable release to point to the latest patch version.
 
@@ -281,7 +281,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get release info
   id: release-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     tag-type: release
@@ -301,7 +301,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get latest release
   id: release-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     tag-type: release
@@ -317,7 +317,7 @@ Query releases from remote repositories. Releases are not supported for local re
 ```yaml
 - name: Get tag info
   id: tag-info
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: v1.0.0
     repository: https://github.com/owner/repo
@@ -391,14 +391,15 @@ jobs:
     steps:
       - name: Get tag info
         id: tag-info
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: latest
           repository: https://github.com/owner/repo
           # No token needed - automatically uses GITHUB_TOKEN
 
       - name: Display tag
-        run: echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
+        run: |
+          echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
 ```
 
 ### Using Custom Personal Access Token
@@ -417,14 +418,15 @@ jobs:
     steps:
       - name: Get tag info from external repository
         id: tag-info
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: latest
           repository: https://github.com/other-org/other-repo
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Custom PAT with access to other-org
 
       - name: Display tag
-        run: echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
+        run: |
+          echo "Latest tag: ${{ steps.tag-info.outputs.name }}"
 ```
 
 ### Using Custom Token for Private Repositories
@@ -441,7 +443,7 @@ jobs:
     steps:
       - name: Get tag info from private repository
         id: tag-info
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: v1.0.0
           repository: https://github.com/private-org/private-repo
@@ -470,7 +472,7 @@ jobs:
       # Current repo - uses default GITHUB_TOKEN
       - name: Get tag from current repo
         id: current-repo
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: latest
           # No token - uses GITHUB_TOKEN automatically
@@ -478,7 +480,7 @@ jobs:
       # External public repo - uses default GITHUB_TOKEN
       - name: Get tag from external public repo
         id: external-public
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: latest
           repository: https://github.com/actions/checkout
@@ -487,7 +489,7 @@ jobs:
       # External private repo - requires custom token
       - name: Get tag from external private repo
         id: external-private
-        uses: LiquidLogicLabs/git-action-tag-info@v1
+        uses: LiquidLogicLabs/git-action-tag-info@v2
         with:
           tag-name: latest
           repository: https://github.com/private-org/private-repo
@@ -550,7 +552,7 @@ For self-hosted instances (especially Gitea) that use self-signed SSL certificat
 
 ```yaml
 - name: Get tag from self-hosted instance
-  uses: LiquidLogicLabs/git-action-tag-info@v1
+  uses: LiquidLogicLabs/git-action-tag-info@v2
   with:
     tag-name: latest
     repository: https://git.example.com/owner/repo

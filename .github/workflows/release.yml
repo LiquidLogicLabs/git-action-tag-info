@@ -94,7 +94,7 @@ jobs:
           mode: "HYBRID"
           configurationJson: |
             {
-              "template": "#{{CHANGELOG}}\n\n<details>\n<summary>Pull Requests</summary>\n\n#{{PR_LIST}}\n</details>\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/git-action-tag-info@${{ github.ref_name }}\n  with:\n    tag_name: 'latest'\n    repository: 'https://github.com/owner/repo'\n```"
+              "template": "#{{CHANGELOG}}\n\n---\n\n### Usage\n\n```yaml\n- uses: LiquidLogicLabs/git-action-tag-info@${{ github.ref_name }}\n  with:\n    tag-name: 'latest'\n    repository: 'https://github.com/owner/repo'\n```"
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

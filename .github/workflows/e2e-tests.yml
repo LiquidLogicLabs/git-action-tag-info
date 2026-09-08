@@ -131,13 +131,21 @@ jobs:
             echo "Format test skipped/failed (no matching tags)"
           fi
 
-      # Test: Verify action fails when required tag-name input is missing
-      # Note: This will show an error annotation (expected) - the action correctly fails validation
-      # The test uses continue-on-error because we're testing that the action fails as expected
-      - name: Action e2e - Missing tag-name (expects failure)
+      # Test: the action must fail when the required tag-name input is empty.
+      # Passes tag-name: '' rather than omitting the key. core.getInput with
+      # required: true rejects an empty string exactly as it rejects a missing one
+      # ("Input required and not supplied"), so this exercises the same validation
+      # path while remaining valid to actionlint.
+      #
+      # Omitting the key made actionlint report a missing required input, and the
+      # only available silence was a file-wide ignore -- which also hid a genuine
+      # accidental omission planted elsewhere in this file to test exactly that.
+      # continue-on-error is set because the failure IS the assertion.
+      - name: Action e2e - Empty tag-name (expects failure)
         id: missing-tag
         uses: ./  # zizmor: ignore[self-repository] — local ACTION reference under test, not a reusable-workflow call; $/ does not apply
         with:
+          tag-name: ''
           repository: .
         continue-on-error: true
 

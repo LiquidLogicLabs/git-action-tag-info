@@ -257,22 +257,22 @@ You can provide multiple format patterns as fallbacks. Patterns are tried in ord
 
 This action supports flexible version pinning to balance stability and updates:
 
-**Major Version** (`@v1`):
-- Automatically updates to the latest `v1.x.x` release
+**Major Version** (`@v2`):
+- Automatically updates to the latest `v2.x.x` release
 - Recommended for most users who want bug fixes and minor updates
 - Example: `uses: LiquidLogicLabs/git-action-tag-info@v2`
 
-**Minor Version** (`@v1.0`):
-- Automatically updates to the latest `v1.0.x` patch release
+**Minor Version** (`@v2.0`):
+- Automatically updates to the latest `v2.0.x` patch release
 - Recommended when you want to stay on a specific minor version
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2`
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2.0`
 
-**Exact Version** (e.g. `@v1.2.3`):
+**Exact Version** (e.g. `@v2.0.10`):
 - Pins to a specific release
 - Recommended for production workflows requiring maximum stability
-- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2` (pick a tag from Releases)
+- Example: `uses: LiquidLogicLabs/git-action-tag-info@v2.0.10` (pick a tag from Releases)
 
-> **Note**: Major and minor version tags (e.g., `v1`, `v1.0`) are automatically created/updated with each stable release to point to the latest patch version.
+> **Note**: Major and minor version tags (e.g., `v2`, `v2.0`) are automatically created/updated with each stable release to point to the latest patch version.
 
 ### Get Release Information
 

@@ -52,3 +52,4 @@ coverage/
 
 # npm registry auth (keep local; do not commit credentials)
 .npmrc
+_bmad-output/

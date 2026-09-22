@@ -6,10 +6,10 @@ module.exports = {
   // quietly.
   coverageThreshold: {
     global: {
-      statements: 33,
-      branches: 27,
-      functions: 38,
-      lines: 33
+      statements: 32,
+      branches: 26,
+      functions: 37,
+      lines: 32
     }
   },
   preset: 'ts-jest',

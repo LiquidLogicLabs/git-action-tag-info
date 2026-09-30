@@ -1,12 +1,12 @@
-import { resolveLatestTag } from '../tag-resolver';
-import { PlatformAPI } from '../types';
+import { resolveLatestTag, filterPublishedReleases } from '../tag-resolver';
+import { PlatformAPI, ReleaseSummary } from '../types';
 
 // Create mock PlatformAPI
 function createMockPlatformAPI(mocks: {
   getAllTagNames?: () => Promise<string[]>;
   getAllTags?: () => Promise<Array<{ name: string; date: string }>>;
   getAllReleaseNames?: () => Promise<string[]>;
-  getAllReleases?: () => Promise<Array<{ name: string; date: string }>>;
+  getAllReleases?: () => Promise<ReleaseSummary[]>;
 }): PlatformAPI {
   return {
     getTagInfo: jest.fn(),
@@ -264,4 +264,119 @@ describe('tag-resolver', () => {
       });
     });
   });
+
+  describe('draft and prerelease handling', () => {
+    // Modelled on the real n8n release feed, which is what exposed this: a
+    // moving `stable` release, a parallel 2.40.x prerelease line and a 1.123.x
+    // LTS line all published within minutes of the current stable release.
+    const n8nReleases: ReleaseSummary[] = [
+      { name: 'stable', date: '2026-09-21T07:41:34Z', isDraft: false, isPrerelease: false },
+      { name: 'n8n@2.39.9', date: '2026-09-21T07:41:33Z', isDraft: false, isPrerelease: false },
+      { name: 'n8n@2.40.4', date: '2026-09-21T07:32:15Z', isDraft: false, isPrerelease: true },
+      { name: 'beta', date: '2026-09-21T07:32:17Z', isDraft: false, isPrerelease: true },
+      { name: 'n8n@1.123.81', date: '2026-09-17T07:59:31Z', isDraft: false, isPrerelease: false },
+      { name: 'n8n@2.39.8', date: '2026-09-18T07:54:04Z', isDraft: false, isPrerelease: false },
+    ];
+
+    it('should resolve the highest stable release, not the newest by date', async () => {
+      const mockAPI = createMockPlatformAPI({
+        getAllReleases: jest.fn().mockResolvedValue(n8nReleases),
+      });
+
+      const latest = await resolveLatestTag(mockAPI, undefined, 'release');
+
+      // Before the fix this returned 'stable' -- the most recent by date, and a
+      // moving target that no changelog or version parser can resolve.
+      expect(latest).toBe('n8n@2.39.9');
+    });
+
+    it('should not select a prerelease by default', async () => {
+      const mockAPI = createMockPlatformAPI({
+        getAllReleases: jest.fn().mockResolvedValue([
+          { name: 'n8n@2.39.9', date: '2026-09-21T07:41:33Z', isPrerelease: false },
+          { name: 'n8n@2.40.4', date: '2026-09-21T07:32:15Z', isPrerelease: true },
+        ]),
+      });
+
+      expect(await resolveLatestTag(mockAPI, undefined, 'release')).toBe('n8n@2.39.9');
+    });
+
+    it('should select a prerelease when include-prereleases is set', async () => {
+      const mockAPI = createMockPlatformAPI({
+        getAllReleases: jest.fn().mockResolvedValue([
+          { name: 'n8n@2.39.9', date: '2026-09-21T07:41:33Z', isPrerelease: false },
+          { name: 'n8n@2.40.4', date: '2026-09-21T07:32:15Z', isPrerelease: true },
+        ]),
+      });
+
+      expect(await resolveLatestTag(mockAPI, undefined, 'release', true)).toBe('n8n@2.40.4');
+    });
+
+    it('should never select a draft, even with include-prereleases', async () => {
+      const mockAPI = createMockPlatformAPI({
+        getAllReleases: jest.fn().mockResolvedValue([
+          { name: 'v1.0.0', date: '2026-01-01T00:00:00Z', isDraft: false },
+          { name: 'v9.9.9', date: '2026-02-01T00:00:00Z', isDraft: true },
+        ]),
+      });
+
+      expect(await resolveLatestTag(mockAPI, undefined, 'release', true)).toBe('v1.0.0');
+    });
+
+    it('should leave tag resolution untouched (tags have no draft state)', async () => {
+      const getAllReleases = jest.fn();
+      const mockAPI = createMockPlatformAPI({
+        getAllTagNames: jest.fn().mockResolvedValue(['n8n@1.0.0', 'n8n@2.0.0']),
+        getAllReleases,
+      });
+
+      expect(await resolveLatestTag(mockAPI, undefined, 'tags')).toBe('n8n@2.0.0');
+      expect(getAllReleases).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('filterPublishedReleases', () => {
+    it('should drop drafts and prereleases by default', () => {
+      const result = filterPublishedReleases(
+        [
+          { name: 'a', date: '', isDraft: false, isPrerelease: false },
+          { name: 'b', date: '', isDraft: true, isPrerelease: false },
+          { name: 'c', date: '', isDraft: false, isPrerelease: true },
+        ],
+        false
+      );
+      expect(result.map((r) => r.name)).toEqual(['a']);
+    });
+
+    it('should treat missing flags as published (forges without the concept)', () => {
+      // Bitbucket has no releases and reports tags here, with neither flag set.
+      const result = filterPublishedReleases(
+        [{ name: 'v1.0.0', date: '' }, { name: 'v2.0.0', date: '' }],
+        false
+      );
+      expect(result.map((r) => r.name)).toEqual(['v1.0.0', 'v2.0.0']);
+    });
+
+    it('should fall back rather than report no releases when all are prereleases', () => {
+      // A pre-1.0 project may mark every release a prerelease; resolving that to
+      // "no releases found in repository" would be actively misleading.
+      const all: ReleaseSummary[] = [
+        { name: 'v0.1.0', date: '', isPrerelease: true },
+        { name: 'v0.2.0', date: '', isPrerelease: true },
+      ];
+      expect(filterPublishedReleases(all, false).map((r) => r.name)).toEqual([
+        'v0.1.0',
+        'v0.2.0',
+      ]);
+    });
+
+    it('should still exclude drafts in that fallback', () => {
+      const all: ReleaseSummary[] = [
+        { name: 'v0.1.0', date: '', isPrerelease: true },
+        { name: 'v0.9.9', date: '', isPrerelease: true, isDraft: true },
+      ];
+      expect(filterPublishedReleases(all, false).map((r) => r.name)).toEqual(['v0.1.0']);
+    });
+  });
+
 });

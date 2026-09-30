@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import { PlatformAPI } from './types';
+import { PlatformAPI, ReleaseSummary } from './types';
 import { isSemver, sortTagsBySemver } from './semver';
 import { filterTagsByFormat } from './format-matcher';
 
@@ -59,7 +59,8 @@ async function filterTagsWithFallback(
 export async function resolveLatestTag(
   platformAPI: PlatformAPI,
   tagFormat?: string | string[],
-  itemType: 'tags' | 'release' = 'tags'
+  itemType: 'tags' | 'release' = 'tags',
+  includePrereleases: boolean = false
 ): Promise<string> {
   const itemLabel = itemType === 'release' ? 'release' : 'tag';
   core.info(`Resolving latest ${itemLabel}...`);
@@ -123,7 +124,7 @@ export async function resolveLatestTag(
   // For releases or if semver failed, get items with dates
   const allItems = itemType === 'tags'
     ? await platformAPI.getAllTags()
-    : await platformAPI.getAllReleases();
+    : filterPublishedReleases(await platformAPI.getAllReleases(), includePrereleases);
 
   if (allItems.length === 0) {
     throw new Error(`No ${itemLabel}s found in repository`);
@@ -173,3 +174,47 @@ export async function resolveLatestTag(
   return sorted[sorted.length - 1];
 }
 
+/**
+ * Drop releases that are not candidates for "latest".
+ *
+ * A draft is unpublished, so it is never a candidate. A prerelease is only a
+ * candidate when the caller asks for one. This mirrors what GitHub's own
+ * /releases/latest endpoint does, and without it a project that publishes a
+ * prerelease line in parallel with its stable line (n8n ships 2.40.x betas
+ * alongside 2.39.x) resolves "latest" to the prerelease.
+ */
+export function filterPublishedReleases(
+  releases: ReleaseSummary[],
+  includePrereleases: boolean
+): ReleaseSummary[] {
+  const published = releases.filter((release) => {
+    if (release.isDraft === true) {
+      return false;
+    }
+    if (release.isPrerelease === true && !includePrereleases) {
+      return false;
+    }
+    return true;
+  });
+
+  const dropped = releases.length - published.length;
+  if (dropped > 0) {
+    core.info(
+      `Excluded ${dropped} draft/prerelease release(s) from "latest" resolution` +
+        (includePrereleases ? ' (drafts only; prereleases allowed)' : '')
+    );
+  }
+
+  // Never hand back an empty set when the platform did return releases -- that
+  // would turn "every release is a prerelease" into a confusing "no releases
+  // found in repository".
+  if (published.length === 0 && releases.length > 0) {
+    core.warning(
+      'All releases are drafts or prereleases; falling back to the full set. ' +
+        'Set include-prereleases: true to select them deliberately.'
+    );
+    return releases.filter((release) => release.isDraft !== true);
+  }
+
+  return published;
+}

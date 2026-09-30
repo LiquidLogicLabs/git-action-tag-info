@@ -14,6 +14,8 @@ Get tag and release information from local and remote repositories (GitHub, Gite
 - **Tags and Releases**: Support for both git tags and platform releases
 - **Flexible input**: Support both URL format and separate inputs
 - **Latest resolution**: Automatically resolve "latest" tag or release using semver-first, date fallback strategy
+- **Namespaced tags**: Versions carrying a name prefix (`n8n@2.39.9`, `pkg/1.2.3`) are compared as versions, not by date
+- **Publication aware**: `"latest"` skips draft and prerelease releases by default
 - **Comprehensive info**: Get item SHA, commit SHA, item type, details, and verification status
 
 ## Usage
@@ -349,6 +351,7 @@ Query releases from remote repositories. Releases are not supported for local re
 | `token` | Custom Personal Access Token (works for all platforms). If not provided, automatically falls back to `GITHUB_TOKEN` environment variable when available (e.g., in GitHub Actions) | No | - |
 | `skip-certificate-check` | Ignore SSL certificate errors (useful for self-hosted instances with self-signed certificates). **Warning**: This is a security risk and should only be used with trusted self-hosted instances | No | `false` |
 | `tag-type` | Type of item to fetch: `"tags"` (git tags) or `"release"` (platform releases). Releases are only supported for remote repositories (not local). Default: `"tags"` | No | `tags` |
+| `include-prereleases` | When resolving `"latest"` for `tag-type: release`, also consider prereleases. Drafts are never considered. Default: `false` | No | `false` |
 | `tag-format` | Format pattern(s) to filter tags/releases when resolving "latest". Supports single pattern (e.g., `"X.X"`), JSON array string (e.g., `'["*.*.*", "*.*"]'`), or comma-separated values (e.g., `"*.*.*,*.*"`). Patterns are tried in order as fallbacks - if first pattern matches no items, second pattern is tried, etc. Only items matching the first successful format pattern will be considered when resolving "latest" | No | - |
 | `verbose` | Enable verbose logging for operational details | No | `false` |
 
@@ -510,9 +513,23 @@ When `tag-name` is set to `"latest"`, the action uses the following strategy:
    - If `tag-format` is an array, patterns are tried in order as fallbacks
    - First pattern that matches at least one item is used
    - If no patterns match any items, the action fails with a clear error message
-2. **Semver First**: If semantic version tags/releases exist (e.g., v1.2.3, 1.0.0), it selects the highest version
-3. **Date Fallback**: If no semver items exist, it selects the most recent item by creation/published date
-4. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
+2. **Publication Filtering** (releases only): Drafts are dropped. Prereleases are dropped unless `include-prereleases: true`. If that leaves nothing but every release was a prerelease, the action warns and considers them rather than reporting no releases.
+3. **Semver First**: If semantic version tags/releases exist, it selects the highest version. A leading `v` and a name prefix are both tolerated, so `v1.2.3`, `1.2.3`, `n8n@2.39.9`, `pkg/1.2.3` and `release-1.2.3` all compare as versions
+4. **Date Fallback**: If no semver items exist, it selects the most recent item by creation/published date
+5. **Alphabetical Fallback**: If no date information is available, it uses alphabetical order
+
+### Namespaced tags
+
+Projects that tag from a package name produce versions like `n8n@2.39.9` or
+`pkg/1.2.3`. These are compared as versions, which matters when a project
+maintains more than one release line: n8n publishes a `1.123.x` LTS line
+alongside `2.x`, and ordering those by date picks whichever line published most
+recently rather than the highest version.
+
+Recognised separators are `@`, `/`, `-` and `_`. A bare version always wins, so
+`1.2.3-alpha` parses as `1.2.3-alpha` and is never read as a prefix of `alpha`.
+Tags with no version at all — `stable`, `beta`, `nightly`, `2026-09-21` — are
+still not semver, so a moving tag cannot be selected by the semver path.
 
 **Note**: Format filtering happens before sorting, so only items matching the format are considered. If `tag-format` is an array and no patterns match any items, the action will fail with a clear error message listing all attempted patterns. For releases, the date used is the release published date.
 

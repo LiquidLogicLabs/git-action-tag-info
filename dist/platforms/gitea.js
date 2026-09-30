@@ -338,6 +338,8 @@ class GiteaAPI {
                         allReleases.push({
                             name: release.tag_name,
                             date: release.published_at || release.created_at || '',
+                            isDraft: release.draft === true,
+                            isPrerelease: release.prerelease === true,
                         });
                     }
                 }

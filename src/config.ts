@@ -16,6 +16,7 @@ export interface ActionInputs {
   token?: string;
   ignoreCertErrors: boolean;
   tagFormat?: string[];
+  includePrereleases: boolean;
   verbose: boolean;
   debugMode: boolean;
 }
@@ -63,6 +64,7 @@ export function getInputs(): ActionInputs {
   const ignoreCertErrors = getBooleanInput('skip-certificate-check', false);
   const tagFormatInput = getOptionalInput('tag-format');
   const tagFormat = parseTagFormat(tagFormatInput);
+  const includePrereleases = getBooleanInput('include-prereleases', false);
   const verboseInput = getBooleanInput('verbose', false);
 
   function parseBoolean(val?: string): boolean {
@@ -95,6 +97,7 @@ export function getInputs(): ActionInputs {
     token: token?.trim() || undefined,
     ignoreCertErrors,
     tagFormat,
+    includePrereleases,
     verbose,
     debugMode,
   };

@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 /**
  * GitHub API client
@@ -34,10 +34,7 @@ export declare class GitHubAPI implements PlatformAPI {
     /**
      * Get all releases with dates
      */
-    getAllReleases(): Promise<Array<{
-        name: string;
-        date: string;
-    }>>;
+    getAllReleases(): Promise<ReleaseSummary[]>;
 }
 /**
  * Detect GitHub from URL hostname

@@ -64,6 +64,18 @@ export interface HttpResponse {
     body: string;
 }
 /**
+ * Release summary used when resolving "latest".
+ *
+ * `isDraft`/`isPrerelease` are optional because not every forge has the
+ * concept: Bitbucket has no releases at all and reports tags here.
+ */
+export interface ReleaseSummary {
+    name: string;
+    date: string;
+    isDraft?: boolean;
+    isPrerelease?: boolean;
+}
+/**
  * Platform API interface for tag and release operations
  */
 export interface PlatformAPI {
@@ -91,12 +103,11 @@ export interface PlatformAPI {
      */
     getAllReleaseNames(): Promise<string[]>;
     /**
-     * Get all releases with dates
+     * Get all releases with dates, plus draft/prerelease status where the
+     * platform reports it. Filtering is the resolver's job, not the platform's,
+     * so every provider returns the full set and states the facts.
      */
-    getAllReleases(): Promise<Array<{
-        name: string;
-        date: string;
-    }>>;
+    getAllReleases(): Promise<ReleaseSummary[]>;
 }
 /**
  * Platform configuration

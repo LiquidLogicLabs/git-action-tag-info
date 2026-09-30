@@ -34033,6 +34033,7 @@ function getInputs() {
     const ignoreCertErrors = getBooleanInput('skip-certificate-check', false);
     const tagFormatInput = getOptionalInput('tag-format');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
+    const includePrereleases = getBooleanInput('include-prereleases', false);
     const verboseInput = getBooleanInput('verbose', false);
     function parseBoolean(val) {
         return val?.toLowerCase() === 'true' || val === '1';
@@ -34062,6 +34063,7 @@ function getInputs() {
         token: token?.trim() || undefined,
         ignoreCertErrors,
         tagFormat,
+        includePrereleases,
         verbose,
         debugMode,
     };
@@ -34615,7 +34617,7 @@ async function run() {
         if (inputs.tagName.toLowerCase() === 'latest') {
             const itemTypeLabel = inputs.tagType === 'release' ? 'release' : 'tag';
             logger.info(`Resolving latest ${itemTypeLabel}...`);
-            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(platformAPI, inputs.tagFormat, inputs.tagType);
+            resolvedTagName = await (0, tag_resolver_1.resolveLatestTag)(platformAPI, inputs.tagFormat, inputs.tagType, inputs.includePrereleases);
             logger.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
         }
         // Get item information (tag or release)
@@ -35567,6 +35569,8 @@ class GiteaAPI {
                         allReleases.push({
                             name: release.tag_name,
                             date: release.published_at || release.created_at || '',
+                            isDraft: release.draft === true,
+                            isPrerelease: release.prerelease === true,
                         });
                     }
                 }
@@ -36027,10 +36031,12 @@ class GitHubAPI {
                 repo: this.repoInfo.repo,
                 per_page: 100,
             });
-            // Extract release tag names and published dates
+            // Extract release tag names, published dates and publication status
             const allReleases = releases.map((release) => ({
                 name: release.tag_name,
                 date: release.published_at || release.created_at || '',
+                isDraft: release.draft === true,
+                isPrerelease: release.prerelease === true,
             }));
             return allReleases;
         }
@@ -36885,15 +36891,19 @@ exports.isSemver = isSemver;
 exports.compareSemver = compareSemver;
 exports.sortTagsBySemver = sortTagsBySemver;
 /**
- * Parse semantic version from tag name
- * Supports formats like: v1.2.3, 1.2.3, v1.2.3-alpha, 1.2.3-beta.1
+ * Match semver pattern: major.minor.patch[-prerelease][+build]
  */
-function parseSemver(tagName) {
-    // Remove 'v' prefix if present
-    const cleaned = tagName.replace(/^v/i, '');
-    // Match semver pattern: major.minor.patch[-prerelease][+build]
-    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
-    const match = cleaned.match(semverRegex);
+const SEMVER_REGEX = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/;
+/**
+ * Characters that separate a name from its version in a namespaced tag.
+ * Restricted to what git permits in a ref name, so ':' is absent.
+ */
+const PREFIX_SEPARATORS = '@/-_';
+/**
+ * Parse a bare version, tolerating only a leading 'v'
+ */
+function parseVersionCore(candidate) {
+    const match = candidate.replace(/^v/i, '').match(SEMVER_REGEX);
     if (!match) {
         return null;
     }
@@ -36904,6 +36914,37 @@ function parseSemver(tagName) {
         prerelease: match[4],
         build: match[5],
     };
+}
+/**
+ * Parse semantic version from tag name
+ * Supports formats like: v1.2.3, 1.2.3, v1.2.3-alpha, 1.2.3-beta.1
+ *
+ * Also handles namespaced tags, where the version carries a name prefix:
+ * n8n@2.39.9, pkg/1.2.3, release-1.2.3. Monorepos and projects that tag from
+ * a package name produce these, and treating them as non-semver is what makes
+ * callers fall back to ordering by date -- which picks whichever release line
+ * published most recently rather than the highest version.
+ */
+function parseSemver(tagName) {
+    // A bare version wins outright, so '1.2.3-alpha' is never mistaken for a
+    // prefix of 'alpha'.
+    const direct = parseVersionCore(tagName);
+    if (direct) {
+        return direct;
+    }
+    // Walk separators right-to-left so the longest prefix is tried first, but
+    // keep going when the tail alone is not a version: 'foo-1.2.3-alpha' must
+    // resolve to '1.2.3-alpha', not to 'alpha'.
+    for (let i = tagName.length - 1; i > 0; i--) {
+        if (!PREFIX_SEPARATORS.includes(tagName[i])) {
+            continue;
+        }
+        const parsed = parseVersionCore(tagName.slice(i + 1));
+        if (parsed) {
+            return parsed;
+        }
+    }
+    return null;
 }
 /**
  * Check if tag name follows semantic versioning
@@ -37010,6 +37051,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.resolveLatestTag = resolveLatestTag;
+exports.filterPublishedReleases = filterPublishedReleases;
 const core = __importStar(__nccwpck_require__(7484));
 const semver_1 = __nccwpck_require__(1475);
 const format_matcher_1 = __nccwpck_require__(839);
@@ -37050,7 +37092,7 @@ async function filterTagsWithFallback(tagNames, patterns, context) {
  * If tagFormat is provided, filter items by format before sorting
  * If tagFormat is an array, try each pattern in order as fallbacks
  */
-async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
+async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags', includePrereleases = false) {
     const itemLabel = itemType === 'release' ? 'release' : 'tag';
     core.info(`Resolving latest ${itemLabel}...`);
     // Normalize tagFormat to array for consistent handling
@@ -37106,7 +37148,7 @@ async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
     // For releases or if semver failed, get items with dates
     const allItems = itemType === 'tags'
         ? await platformAPI.getAllTags()
-        : await platformAPI.getAllReleases();
+        : filterPublishedReleases(await platformAPI.getAllReleases(), includePrereleases);
     if (allItems.length === 0) {
         throw new Error(`No ${itemLabel}s found in repository`);
     }
@@ -37146,6 +37188,40 @@ async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
     core.warning('No date information available, using alphabetical order');
     const sorted = filteredItems.map((t) => t.name).sort();
     return sorted[sorted.length - 1];
+}
+/**
+ * Drop releases that are not candidates for "latest".
+ *
+ * A draft is unpublished, so it is never a candidate. A prerelease is only a
+ * candidate when the caller asks for one. This mirrors what GitHub's own
+ * /releases/latest endpoint does, and without it a project that publishes a
+ * prerelease line in parallel with its stable line (n8n ships 2.40.x betas
+ * alongside 2.39.x) resolves "latest" to the prerelease.
+ */
+function filterPublishedReleases(releases, includePrereleases) {
+    const published = releases.filter((release) => {
+        if (release.isDraft === true) {
+            return false;
+        }
+        if (release.isPrerelease === true && !includePrereleases) {
+            return false;
+        }
+        return true;
+    });
+    const dropped = releases.length - published.length;
+    if (dropped > 0) {
+        core.info(`Excluded ${dropped} draft/prerelease release(s) from "latest" resolution` +
+            (includePrereleases ? ' (drafts only; prereleases allowed)' : ''));
+    }
+    // Never hand back an empty set when the platform did return releases -- that
+    // would turn "every release is a prerelease" into a confusing "no releases
+    // found in repository".
+    if (published.length === 0 && releases.length > 0) {
+        core.warning('All releases are drafts or prereleases; falling back to the full set. ' +
+            'Set include-prereleases: true to select them deliberately.');
+        return releases.filter((release) => release.isDraft !== true);
+    }
+    return published;
 }
 
 

@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveLatestTag = resolveLatestTag;
+exports.filterPublishedReleases = filterPublishedReleases;
 const core = __importStar(require("@actions/core"));
 const semver_1 = require("./semver");
 const format_matcher_1 = require("./format-matcher");
@@ -74,7 +75,7 @@ async function filterTagsWithFallback(tagNames, patterns, context) {
  * If tagFormat is provided, filter items by format before sorting
  * If tagFormat is an array, try each pattern in order as fallbacks
  */
-async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
+async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags', includePrereleases = false) {
     const itemLabel = itemType === 'release' ? 'release' : 'tag';
     core.info(`Resolving latest ${itemLabel}...`);
     // Normalize tagFormat to array for consistent handling
@@ -130,7 +131,7 @@ async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
     // For releases or if semver failed, get items with dates
     const allItems = itemType === 'tags'
         ? await platformAPI.getAllTags()
-        : await platformAPI.getAllReleases();
+        : filterPublishedReleases(await platformAPI.getAllReleases(), includePrereleases);
     if (allItems.length === 0) {
         throw new Error(`No ${itemLabel}s found in repository`);
     }
@@ -170,5 +171,39 @@ async function resolveLatestTag(platformAPI, tagFormat, itemType = 'tags') {
     core.warning('No date information available, using alphabetical order');
     const sorted = filteredItems.map((t) => t.name).sort();
     return sorted[sorted.length - 1];
+}
+/**
+ * Drop releases that are not candidates for "latest".
+ *
+ * A draft is unpublished, so it is never a candidate. A prerelease is only a
+ * candidate when the caller asks for one. This mirrors what GitHub's own
+ * /releases/latest endpoint does, and without it a project that publishes a
+ * prerelease line in parallel with its stable line (n8n ships 2.40.x betas
+ * alongside 2.39.x) resolves "latest" to the prerelease.
+ */
+function filterPublishedReleases(releases, includePrereleases) {
+    const published = releases.filter((release) => {
+        if (release.isDraft === true) {
+            return false;
+        }
+        if (release.isPrerelease === true && !includePrereleases) {
+            return false;
+        }
+        return true;
+    });
+    const dropped = releases.length - published.length;
+    if (dropped > 0) {
+        core.info(`Excluded ${dropped} draft/prerelease release(s) from "latest" resolution` +
+            (includePrereleases ? ' (drafts only; prereleases allowed)' : ''));
+    }
+    // Never hand back an empty set when the platform did return releases -- that
+    // would turn "every release is a prerelease" into a confusing "no releases
+    // found in repository".
+    if (published.length === 0 && releases.length > 0) {
+        core.warning('All releases are drafts or prereleases; falling back to the full set. ' +
+            'Set include-prereleases: true to select them deliberately.');
+        return releases.filter((release) => release.isDraft !== true);
+    }
+    return published;
 }
 //# sourceMappingURL=tag-resolver.js.map

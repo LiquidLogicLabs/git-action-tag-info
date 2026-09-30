@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, HttpResponse } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, HttpResponse, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 import { tryGitLsRemoteFallback } from './git-fallback';
 import { safeSegment } from '../repo-utils';
@@ -303,7 +303,7 @@ export class BitbucketAPI implements PlatformAPI {
    * Get all releases with dates
    * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names with dates
    */
-  async getAllReleases(): Promise<Array<{ name: string; date: string }>> {
+  async getAllReleases(): Promise<ReleaseSummary[]> {
     // Bitbucket doesn't have releases, so return tags with dates
     return this.getAllTags();
   }

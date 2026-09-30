@@ -13,6 +13,7 @@ export interface ActionInputs {
     token?: string;
     ignoreCertErrors: boolean;
     tagFormat?: string[];
+    includePrereleases: boolean;
     verbose: boolean;
     debugMode: boolean;
 }

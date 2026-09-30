@@ -33,6 +33,10 @@ inputs:
   tag-format:
     description: 'Format pattern(s) to filter tags. Supports single pattern (e.g., "X.X"), JSON array string (e.g., ["*.*.*", "*.*"]), or comma-separated values (e.g., "*.*.*,*.*"). Patterns are tried in order as fallbacks - if first pattern matches no tags, second pattern is tried, etc. When resolving "latest", only tags matching the first successful format pattern will be considered.'
     required: false
+  include-prereleases:
+    description: 'When resolving "latest" for tag-type "release", also consider prereleases. Drafts are never considered. Default: false'
+    default: 'false'
+    required: false
   tag-type:
     description: 'Type of item to fetch: "tags" (git tags) or "release" (platform releases). Default: "tags"'
     required: false

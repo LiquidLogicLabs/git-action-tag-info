@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 /**
  * Local Git API client
@@ -37,10 +37,7 @@ export declare class LocalGitAPI implements PlatformAPI {
      * Get all releases with dates
      * Releases are not supported for local repositories
      */
-    getAllReleases(): Promise<Array<{
-        name: string;
-        date: string;
-    }>>;
+    getAllReleases(): Promise<ReleaseSummary[]>;
 }
 /**
  * Detect local Git repository (always returns undefined - handled by repo-utils)

@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 import { getTagInfo as getLocalTagInfo, getAllTags as getLocalTags } from '../git-client';
 
@@ -70,7 +70,7 @@ export class LocalGitAPI implements PlatformAPI {
    * Get all releases with dates
    * Releases are not supported for local repositories
    */
-  async getAllReleases(): Promise<Array<{ name: string; date: string }>> {
+  async getAllReleases(): Promise<ReleaseSummary[]> {
     throw new Error('Releases are not supported for local repositories');
   }
 }

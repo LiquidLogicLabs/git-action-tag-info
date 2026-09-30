@@ -77,6 +77,7 @@ function getInputs() {
     const ignoreCertErrors = getBooleanInput('skip-certificate-check', false);
     const tagFormatInput = getOptionalInput('tag-format');
     const tagFormat = (0, format_parser_1.parseTagFormat)(tagFormatInput);
+    const includePrereleases = getBooleanInput('include-prereleases', false);
     const verboseInput = getBooleanInput('verbose', false);
     function parseBoolean(val) {
         return val?.toLowerCase() === 'true' || val === '1';
@@ -106,6 +107,7 @@ function getInputs() {
         token: token?.trim() || undefined,
         ignoreCertErrors,
         tagFormat,
+        includePrereleases,
         verbose,
         debugMode,
     };

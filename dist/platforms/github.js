@@ -348,10 +348,12 @@ class GitHubAPI {
                 repo: this.repoInfo.repo,
                 per_page: 100,
             });
-            // Extract release tag names and published dates
+            // Extract release tag names, published dates and publication status
             const allReleases = releases.map((release) => ({
                 name: release.tag_name,
                 date: release.published_at || release.created_at || '',
+                isDraft: release.draft === true,
+                isPrerelease: release.prerelease === true,
             }));
             return allReleases;
         }

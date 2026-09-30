@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 import { HttpClient } from './http-client';
 import { tryGitLsRemoteFallback } from './git-fallback';
@@ -361,11 +361,11 @@ export class GiteaAPI implements PlatformAPI {
   /**
    * Get all releases with dates
    */
-  async getAllReleases(): Promise<Array<{ name: string; date: string }>> {
+  async getAllReleases(): Promise<ReleaseSummary[]> {
     const url = `/repos/${safeSegment(this.repoInfo.owner, 'owner')}/${safeSegment(this.repoInfo.repo, 'repository name')}/releases?limit=100`;
 
     try {
-      const allReleases: Array<{ name: string; date: string }> = [];
+      const allReleases: ReleaseSummary[] = [];
       let page = 1;
       let hasMore = true;
 
@@ -391,6 +391,8 @@ export class GiteaAPI implements PlatformAPI {
             allReleases.push({
               name: release.tag_name,
               date: release.published_at || release.created_at || '',
+              isDraft: release.draft === true,
+              isPrerelease: release.prerelease === true,
             });
           }
         }

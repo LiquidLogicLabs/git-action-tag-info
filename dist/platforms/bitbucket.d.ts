@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 /**
  * Bitbucket API client
@@ -40,10 +40,7 @@ export declare class BitbucketAPI implements PlatformAPI {
      * Get all releases with dates
      * Note: Bitbucket doesn't have a dedicated releases API, so we return tag names with dates
      */
-    getAllReleases(): Promise<Array<{
-        name: string;
-        date: string;
-    }>>;
+    getAllReleases(): Promise<ReleaseSummary[]>;
 }
 /**
  * Detect Bitbucket from URL hostname

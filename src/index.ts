@@ -61,7 +61,12 @@ async function run(): Promise<void> {
     if (inputs.tagName.toLowerCase() === 'latest') {
       const itemTypeLabel = inputs.tagType === 'release' ? 'release' : 'tag';
       logger.info(`Resolving latest ${itemTypeLabel}...`);
-      resolvedTagName = await resolveLatestTag(platformAPI, inputs.tagFormat, inputs.tagType);
+      resolvedTagName = await resolveLatestTag(
+        platformAPI,
+        inputs.tagFormat,
+        inputs.tagType,
+        inputs.includePrereleases
+      );
       logger.info(`Resolved latest ${itemTypeLabel}: ${resolvedTagName}`);
     }
 

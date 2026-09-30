@@ -2,7 +2,7 @@ import * as https from 'https';
 import { Octokit } from '@octokit/rest';
 import { throttling } from '@octokit/plugin-throttling';
 import * as core from '@actions/core';
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, ItemType, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 import { tryGitLsRemoteFallback } from './git-fallback';
 
@@ -331,7 +331,7 @@ export class GitHubAPI implements PlatformAPI {
   /**
    * Get all releases with dates
    */
-  async getAllReleases(): Promise<Array<{ name: string; date: string }>> {
+  async getAllReleases(): Promise<ReleaseSummary[]> {
     try {
       const { data: releases } = await this.octokit.repos.listReleases({
         owner: this.repoInfo.owner,
@@ -339,10 +339,12 @@ export class GitHubAPI implements PlatformAPI {
         per_page: 100,
       });
 
-      // Extract release tag names and published dates
-      const allReleases: Array<{ name: string; date: string }> = releases.map((release) => ({
+      // Extract release tag names, published dates and publication status
+      const allReleases: ReleaseSummary[] = releases.map((release) => ({
         name: release.tag_name,
         date: release.published_at || release.created_at || '',
+        isDraft: release.draft === true,
+        isPrerelease: release.prerelease === true,
       }));
 
       return allReleases;

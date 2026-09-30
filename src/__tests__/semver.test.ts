@@ -63,6 +63,70 @@ describe('semver', () => {
       expect(parseSemver('v1')).toBeNull();
       expect(parseSemver('latest')).toBeNull();
     });
+
+    it('should parse namespaced tags carrying a name prefix', () => {
+      // n8n tags every release as `n8n@X.Y.Z`; treating these as non-semver is
+      // what sent callers down the date-ordered fallback.
+      expect(parseSemver('n8n@2.39.9')).toEqual({
+        major: 2,
+        minor: 39,
+        patch: 9,
+      });
+      expect(parseSemver('pkg/1.2.3')).toEqual({ major: 1, minor: 2, patch: 3 });
+      expect(parseSemver('release-1.2.3')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+      });
+      expect(parseSemver('rel_1.2.3')).toEqual({ major: 1, minor: 2, patch: 3 });
+      expect(parseSemver('@scope/pkg@1.2.3')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+      });
+      expect(parseSemver('n8n@v2.39.9')).toEqual({
+        major: 2,
+        minor: 39,
+        patch: 9,
+      });
+    });
+
+    it('should not mistake a prerelease suffix for a name prefix', () => {
+      // '1.2.3-alpha' must parse as 1.2.3-alpha, never as the version 'alpha'.
+      expect(parseSemver('1.2.3-alpha')).toEqual({
+        major: 1,
+        minor: 2,
+        patch: 3,
+        prerelease: 'alpha',
+      });
+      // With a prefix as well, the tail alone ('beta.1') is not a version, so
+      // parsing must fall back to the earlier separator.
+      expect(parseSemver('release-2.0.0-beta.1')).toEqual({
+        major: 2,
+        minor: 0,
+        patch: 0,
+        prerelease: 'beta.1',
+      });
+      expect(parseSemver('n8n@2.40.4-rc.1+build.7')).toEqual({
+        major: 2,
+        minor: 40,
+        patch: 4,
+        prerelease: 'rc.1',
+        build: 'build.7',
+      });
+    });
+
+    it('should still reject moving and non-version tags', () => {
+      // These are exactly the tags n8n publishes alongside its versioned ones;
+      // if any of them parsed, `latest` could resolve to a moving target.
+      expect(parseSemver('stable')).toBeNull();
+      expect(parseSemver('beta')).toBeNull();
+      expect(parseSemver('nightly')).toBeNull();
+      expect(parseSemver('2026-09-21')).toBeNull();
+      expect(parseSemver('edge-e9613ab3-ls213')).toBeNull();
+      expect(parseSemver('n8n@2.39')).toBeNull();
+      expect(parseSemver('-1.2.3')).toBeNull();
+    });
   });
 
   describe('isSemver', () => {
@@ -123,6 +187,19 @@ describe('semver', () => {
       const tags = ['v1.0.0', 'v2.0.0', 'v1.5.0'];
       const sorted = sortTagsBySemver(tags);
       expect(sorted).toEqual(['v2.0.0', 'v1.5.0', 'v1.0.0']);
+    });
+
+    it('should order namespaced tags by version across release lines', () => {
+      // The real regression: n8n maintains a 1.123.x LTS line alongside 2.x.
+      // Ordering these by date picks whichever published last; only version
+      // ordering reliably yields the highest.
+      const tags = ['n8n@1.123.81', 'n8n@2.39.7', 'n8n@2.39.9', 'n8n@2.9.4'];
+      expect(sortTagsBySemver(tags)).toEqual([
+        'n8n@2.39.9',
+        'n8n@2.39.7',
+        'n8n@2.9.4',
+        'n8n@1.123.81',
+      ]);
     });
 
     it('should handle mixed v-prefixed and non-prefixed tags', () => {

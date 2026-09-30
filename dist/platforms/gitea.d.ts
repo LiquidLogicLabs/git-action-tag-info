@@ -1,4 +1,4 @@
-import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform } from '../types';
+import { PlatformAPI, RepositoryInfo, PlatformConfig, ItemInfo, Platform, ReleaseSummary } from '../types';
 import { Logger } from '../logger';
 /**
  * Gitea API client
@@ -35,10 +35,7 @@ export declare class GiteaAPI implements PlatformAPI {
     /**
      * Get all releases with dates
      */
-    getAllReleases(): Promise<Array<{
-        name: string;
-        date: string;
-    }>>;
+    getAllReleases(): Promise<ReleaseSummary[]>;
 }
 /**
  * Detect Gitea from URL hostname

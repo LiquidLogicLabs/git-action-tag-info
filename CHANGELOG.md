@@ -1,3 +1,16 @@
+# [2.1.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.10...v2.1.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **release-notes:** categorise revert commits under Maintenance ([503efb8](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/503efb81aff5df1df0deb5e69b0e211ca000e676))
+* **release-notes:** categorise the changelog by conventional-commit type ([b33e902](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/b33e902ca917002f7f8d7ba07ccb30f1c4147d6c))
+* **release-notes:** drop the dead PR_LIST placeholder ([2868733](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/286873389f715843b05023fa4952d87a96049e05))
+
+
+### Features
+
+* **tag-info:** add include-prereleases input for latest resolution ([0908a20](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/0908a20a6aecc7a4a55430fa61262bb72c9717c0))
 ## [2.0.10](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.9...v2.0.10) (2026-09-08)
 ## [2.0.9](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.8...v2.0.9) (2026-09-08)
 

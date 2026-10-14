@@ -1,3 +1,9 @@
+## [2.1.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.1.0...v2.1.1) (2026-10-14)
+
+
+### Bug Fixes
+
+* **gitea:** match the exact tag in git/refs/tags responses ([ef5e9ce](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/ef5e9cefb2466e5f185f5dd0ac9bdcd30171304d))
 # [2.1.0](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.0.10...v2.1.0) (2026-10-03)
 
 

@@ -35240,6 +35240,15 @@ const http_client_1 = __nccwpck_require__(3696);
 const git_fallback_1 = __nccwpck_require__(8715);
 const repo_utils_1 = __nccwpck_require__(4595);
 /**
+ * Pick the ref for exactly `tagName` from a git/refs/tags response. Gitea returns an array of
+ * every ref with that prefix (`tags/v3` also lists v3.6, v3.7, ...); a single object is
+ * accepted too.
+ */
+function findExactTagRef(body, tagName) {
+    const refs = Array.isArray(body) ? body : [body];
+    return refs.find((r) => r?.ref === `refs/tags/${tagName}`);
+}
+/**
  * Gitea API client
  */
 class GiteaAPI {
@@ -35272,7 +35281,13 @@ class GiteaAPI {
         const url = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(tagName, 'tag name')}`;
         try {
             const response = await this.client.get(url);
-            if (response.statusCode === 404) {
+            if (response.statusCode !== 200 && response.statusCode !== 404) {
+                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
+            }
+            // Gitea answers with every ref whose name starts with tagName, so a 200 can still mean
+            // the tag itself does not exist.
+            const refData = response.statusCode === 200 ? findExactTagRef(JSON.parse(response.body), tagName) : undefined;
+            if (!refData) {
                 // Try fallback: check remote tags via git ls-remote if we have a repository URL
                 const fallbackResult = (0, git_fallback_1.tryGitLsRemoteFallback)(tagName, this.repoInfo.url, this.logger);
                 if (fallbackResult) {
@@ -35290,10 +35305,6 @@ class GiteaAPI {
                     is_prerelease: false,
                 };
             }
-            if (response.statusCode !== 200) {
-                throw new Error(`Gitea API error: ${response.statusCode} - ${response.body}`);
-            }
-            const refData = JSON.parse(response.body);
             // Get the object SHA (could be tag or commit)
             const objectSha = refData.object?.sha || '';
             const objectType = refData.object?.type || '';
@@ -35373,10 +35384,10 @@ class GiteaAPI {
                 const tagUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/refs/tags/${(0, repo_utils_1.safeSegment)(releaseData.tag_name, 'tag name')}`;
                 const tagResponse = await this.client.get(tagUrl);
                 if (tagResponse.statusCode === 200) {
-                    const refData = JSON.parse(tagResponse.body);
-                    itemSha = refData.object?.sha || '';
+                    const refData = findExactTagRef(JSON.parse(tagResponse.body), releaseData.tag_name);
+                    itemSha = refData?.object?.sha || '';
                     // Get commit SHA from tag object if it's an annotated tag
-                    if (refData.object?.type === 'tag' && itemSha) {
+                    if (refData?.object?.type === 'tag' && itemSha) {
                         const tagObjUrl = `/repos/${(0, repo_utils_1.safeSegment)(this.repoInfo.owner, 'owner')}/${(0, repo_utils_1.safeSegment)(this.repoInfo.repo, 'repository name')}/git/tags/${(0, repo_utils_1.safeSegment)(itemSha, 'tag object SHA')}`;
                         const tagObjResponse = await this.client.get(tagObjUrl);
                         if (tagObjResponse.statusCode === 200) {

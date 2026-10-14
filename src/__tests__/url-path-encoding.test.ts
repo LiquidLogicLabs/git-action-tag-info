@@ -120,7 +120,7 @@ describe('Gitea call sites', () => {
   it('encodes the annotated-tag object SHA, which is a server-supplied response field', async () => {
     mockGet((p) =>
       p.includes('/git/refs/tags/')
-        ? { statusCode: 200, body: JSON.stringify({ object: { sha: '../../../user', type: 'tag' } }) }
+        ? { statusCode: 200, body: JSON.stringify({ ref: 'refs/tags/v1', object: { sha: '../../../user', type: 'tag' } }) }
         : { statusCode: 200, body: JSON.stringify({ object: { sha: 'abc' }, message: 'm' }) }
     );
     await new GiteaAPI(repoInfo, giteaConfig, logger).getTagInfo('v1');

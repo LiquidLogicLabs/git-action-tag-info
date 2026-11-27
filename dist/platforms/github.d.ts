@@ -42,7 +42,12 @@ export declare class GitHubAPI implements PlatformAPI {
 export declare function detectFromUrlByHostname(url: URL): Platform | undefined;
 export declare function detectFromUrl(url: URL, logger: Logger): Promise<Platform | undefined>;
 /**
- * Determine base URL for GitHub API
+ * Determine base URL for GitHub API.
+ *
+ * Only a GitHub API URL is accepted: api.github.com, or a GitHub Enterprise Server REST
+ * endpoint (`/api/v3`). Any other URL is skipped, because the candidates include the
+ * runner's environment: a Gitea Actions runner exports GITEA_API_URL (`.../api/v1`), and
+ * taking it sent github.com lookups to Gitea, which answered 401.
  */
 export declare function determineBaseUrl(urls: string | string[]): string | undefined;
 //# sourceMappingURL=github.d.ts.map

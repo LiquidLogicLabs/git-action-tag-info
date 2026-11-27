@@ -402,19 +402,25 @@ export async function detectFromUrl(url: URL, logger: Logger): Promise<Platform 
 }
 
 /**
- * Determine base URL for GitHub API
+ * Determine base URL for GitHub API.
+ *
+ * Only a GitHub API URL is accepted: api.github.com, or a GitHub Enterprise Server REST
+ * endpoint (`/api/v3`). Any other URL is skipped, because the candidates include the
+ * runner's environment: a Gitea Actions runner exports GITEA_API_URL (`.../api/v1`), and
+ * taking it sent github.com lookups to Gitea, which answered 401.
  */
 export function determineBaseUrl(urls: string | string[]): string | undefined {
   const urlArray = Array.isArray(urls) ? urls : [urls];
 
-  // If explicitly provided base URL exists, use it (would be in the array)
   for (const urlStr of urlArray) {
     if (!urlStr) continue;
     try {
       const url = new URL(urlStr);
-      // Check if this looks like an API URL
-      if (url.pathname.includes('/api')) {
-        return urlStr;
+      if (url.hostname.toLowerCase() === 'api.github.com') {
+        return 'https://api.github.com';
+      }
+      if (/\/api\/v3\/?$/.test(url.pathname)) {
+        return urlStr.replace(/\/+$/, '');
       }
     } catch {
       // Not a valid URL, skip

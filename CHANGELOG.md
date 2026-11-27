@@ -1,3 +1,9 @@
+## [2.1.2](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.1.1...v2.1.2) (2026-11-27)
+
+
+### Bug Fixes
+
+* **github:** never take a non-GitHub API URL as the GitHub base URL ([97dfdc3](https://github.com/LiquidLogicLabs/git-action-tag-info/commit/97dfdc3b081263f5409069877537bcaadfd05520))
 ## [2.1.1](https://github.com/LiquidLogicLabs/git-action-tag-info/compare/v2.1.0...v2.1.1) (2026-10-14)
 
 
